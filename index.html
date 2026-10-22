@@ -80,34 +80,16 @@
   .riga-impostazione + .campo-email { padding: 0 16px 14px; }
 
   /* Diario */
-  /* I due grafici hanno la stessa struttura: titolo, area di altezza fissa, legenda */
+  /* Grafico del giorno: kcal totali + grammi dei macronutrienti */
+  .grafico-giorno { display: flex; flex-direction: column; align-items: center; padding: 20px 16px 0; }
+  .kcal-giorno { text-align: center; margin-bottom: 16px; }
+  .kcal-giorno .numero { font-family: var(--titoli); font-weight: 800; font-size: clamp(44px, 13vw, 58px); line-height: 1; letter-spacing: -0.03em; }
+  .kcal-giorno .di { font-size: 14px; color: var(--inchiostro-tenue); margin-top: 4px; }
+  .kcal-giorno .resto { font-size: 13px; margin-top: 2px; font-weight: 600; }
+  .kcal-giorno .resto.sopra { color: var(--rosso); }
   .titolo-grafico { margin: 0 0 12px; font-family: var(--titoli); font-weight: 700; font-size: 17px; text-align: center; }
   .area-grafico { position: relative; width: 100%; height: min(72vw, 280px); display: grid; place-items: center; }
-  .area-grafico > svg { height: 100%; width: auto; max-width: 100%; overflow: visible; display: block; }
-  .area-grafico > svg.barre { width: 100%; height: min(72vw, 280px); }
-  .area-grafico > svg.svg-torta { width: min(72vw, 280px); height: min(72vw, 280px); }
-  .torta .centro { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; text-align: center; }
-  .torta .cat-nome { font-weight: 700; font-size: 15px; margin-bottom: 2px; }
-  .fetta { cursor: pointer; transition: opacity .2s; }
-  .fetta.spenta { opacity: .25; }
-  .legenda span[data-cat] { cursor: pointer; transition: opacity .2s; }
-  .legenda span.spenta { opacity: .35; }
-  .legenda .nota-legenda { width: 100%; justify-content: center; text-align: center; color: var(--inchiostro-tenue); font-size: 12px; }
-  .torta .numero { font-family: var(--titoli); font-weight: 800; font-size: clamp(44px, 13vw, 58px); line-height: 1; letter-spacing: -0.03em; }
-  .torta .di { font-size: 14px; color: var(--inchiostro-tenue); margin-top: 4px; }
-  .torta .resto { font-size: 13px; margin-top: 2px; font-weight: 600; }
-  .torta .resto.sopra { color: var(--rosso); }
-  .legenda { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; padding: 12px 4px 4px; font-size: 13px; }
-  .legenda span { display: inline-flex; align-items: center; gap: 6px; }
-  .legenda i, .pallino { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
-  .legenda b { font-weight: 600; }
-  /* Carosello dei grafici */
-  .carosello { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-  .carosello::-webkit-scrollbar { display: none; }
-  .slide { flex: 0 0 100%; scroll-snap-align: center; min-width: 0; display: flex; flex-direction: column; align-items: center; padding: 20px 16px 0; }
-  .puntini { display: flex; justify-content: center; gap: 7px; padding: 10px 0 0; }
-  .puntini button { width: 8px; height: 8px; border-radius: 50%; background: var(--linea); padding: 0; }
-  .puntini button[aria-current="true"] { background: var(--inchiostro); width: 20px; border-radius: 4px; }
+  .area-grafico > svg.barre { width: 100%; height: min(72vw, 280px); overflow: visible; display: block; }
   .chip .q { color: var(--inchiostro-tenue); }
   .chip .q.mod { color: var(--inchiostro); font-weight: 700; }
   .fonte { display: block; font-size: 12px; color: var(--inchiostro-tenue); margin-top: 2px; }
@@ -333,7 +315,7 @@
     cache: {}, caricati: {},
     vista: 'diario', corrente: null, giorno: null,
     pasto: null, scelta: [], filtro: null,
-    aperti: {}, filtroIng: null, cercaIng: '', catSel: null
+    aperti: {}, filtroIng: null, cercaIng: ''
   };
   const prefisso = daLink ? 'pal_' : 'pa_';
   const lettura = () => stato.ruolo === 'lettura';
@@ -540,25 +522,9 @@
   function disegnaGiorno() {
     const g = stato.giorno, ob = stato.dati.obiettivi;
     const kcal = g.totale.kcal, resto = ob.kcal - kcal;
-    const conValori = g.categorie.filter((c) => c.kcal > 0);
-    let html = '<div class="carosello" id="carosello">';
-    // 1) Torta delle calorie per categoria
-    html += '<div class="slide"><h3 class="titolo-grafico">Calorie per categoria</h3>' +
-      '<div class="area-grafico torta" id="area-torta">' + torta(g.categorie) + '<div class="centro" id="centro-torta">' + centroTorta(g) + '</div></div>' +
-      '<div class="legenda" id="legenda-torta">' + (conValori.length
-        ? conValori.map((c) => '<span data-cat="' + esc(c.nome) + '"><i style="background:' + (COLORI[c.nome] || '#ccc') + '"></i>' + esc(c.nome) + ' <b>' + fmt(c.kcal) + '</b></span>').join('')
-        : '<span class="vuoto">' + (lettura() ? 'Nessun alimento registrato' : 'Scegli cosa hai mangiato per vedere la torta') + '</span>') + '</div></div>';
-    // 2) Grammi dei macronutrienti
-    const kP = g.totale.proteine * 4, kC = g.totale.carboidrati * 4, kG = g.totale.grassi * 9, kT = kP + kC + kG;
-    html += '<div class="slide"><h3 class="titolo-grafico">Macronutrienti (g)</h3>' +
-      '<div class="area-grafico">' + graficoGrammi(g.totale) + '</div>' +
-      '<div class="legenda">' + (kT > 0
-        ? [['Proteine', kP, '#B5523B'], ['Carboidrati', kC, '#E8B04F'], ['Grassi', kG, '#8E6E53']].map((x) =>
-            '<span><i style="background:' + x[2] + '"></i>' + x[0] + ' <b>' + fmt(x[1] / kT * 100) + '%</b></span>').join('') +
-          '<span class="nota-legenda">percentuale delle calorie da ogni macronutriente</span>'
-        : '<span class="vuoto">Nessun alimento registrato</span>') + '</div></div>';
-    html += '</div>';
-    html += '<div class="puntini" id="puntini"><button aria-label="Calorie per categoria" data-slide="0"></button><button aria-label="Macronutrienti in grammi" data-slide="1"></button></div>';
+    let html = '<div class="grafico-giorno"><div class="kcal-giorno"><div class="numero">' + fmt(kcal) + '</div><div class="di">di ' + fmt(ob.kcal) + ' kcal</div>' +
+      '<div class="resto' + (resto < 0 ? ' sopra' : '') + '">' + (resto < 0 ? fmt(-resto) + ' oltre l\'obiettivo' : fmt(resto) + ' rimanenti') + '</div></div>' +
+      '<h3 class="titolo-grafico">Macronutrienti (g)</h3><div class="area-grafico">' + graficoGrammi(g.totale) + '</div></div>';
     html += '<div class="macro"><div><strong>' + fmt(g.totale.proteine) + ' g</strong><span>Proteine</span></div>' +
       '<div><strong>' + fmt(g.totale.carboidrati) + ' g</strong><span>Carboidrati</span></div>' +
       '<div><strong>' + fmt(g.totale.grassi) + ' g</strong><span>Grassi</span></div></div>';
@@ -578,8 +544,6 @@
         (stato.nonLetti.some((c) => c.data === g.data) ? '<button id="vai-commenti">Leggi</button>' : '<button id="vai-commenti">Vedi</button>') + '</div>' + html;
     }
     $('contenuto').innerHTML = html;
-    impostaCarosello();
-    impostaTorta();
     impostaCommenti(g);
     if (!lettura()) {
       document.querySelectorAll('.pasto').forEach((b) => b.onclick = () => apriPannello(Number(b.dataset.pasto)));
@@ -670,16 +634,6 @@
     try { if (n && navigator.setAppBadge) navigator.setAppBadge(n); else if (navigator.clearAppBadge) navigator.clearAppBadge(); } catch (e) { /* non supportato */ }
   }
 
-  function impostaCarosello() {
-    const c = $('carosello'); if (!c) return;
-    const puntini = () => document.querySelectorAll('#puntini button').forEach((b, i) => b.setAttribute('aria-current', String(i === (stato.slide || 0))));
-    c.scrollLeft = (stato.slide || 0) * c.clientWidth;
-    puntini();
-    let t;
-    c.addEventListener('scroll', () => { clearTimeout(t); t = setTimeout(() => { stato.slide = Math.round(c.scrollLeft / c.clientWidth); puntini(); }, 60); }, { passive: true });
-    document.querySelectorAll('#puntini button').forEach((b) => b.onclick = () => { c.scrollTo({ left: Number(b.dataset.slide) * c.clientWidth, behavior: 'smooth' }); });
-  }
-
   function graficoGrammi(t) {
     const voci = [['Proteine', t.proteine, '#B5523B'], ['Carboidrati', t.carboidrati, '#E8B04F'], ['Grassi', t.grassi, '#8E6E53']];
     const max = Math.max(1, ...voci.map((v) => v[1]));
@@ -699,47 +653,6 @@
     if (!a) return '';
     const mod = pers !== undefined && pers !== '' && pers !== null;
     return ' <span class="q' + (mod ? ' mod' : '') + '">· ' + fmt(quantita(a, pasto, pers), 1) + ' ' + esc(a.u) + '</span>';
-  }
-
-  // Centro della torta: totale del giorno, oppure la categoria toccata
-  function centroTorta(g) {
-    const ob = stato.dati.obiettivi;
-    const tot = g.categorie.reduce((s, c) => s + c.kcal, 0);
-    const sel = stato.catSel && g.categorie.find((c) => c.nome === stato.catSel && c.kcal > 0);
-    if (sel) {
-      return '<div><div class="cat-nome" style="color:' + (COLORI[sel.nome] || 'inherit') + '">' + esc(sel.nome) + '</div>' +
-        '<div class="numero">' + fmt(sel.kcal) + '</div><div class="di">kcal · ' + fmt(sel.kcal / tot * 100) + '% del giorno</div></div>';
-    }
-    const kcal = g.totale.kcal, resto = ob.kcal - kcal;
-    return '<div><div class="numero">' + fmt(kcal) + '</div><div class="di">di ' + fmt(ob.kcal) + ' kcal</div>' +
-      '<div class="resto' + (resto < 0 ? ' sopra' : '') + '">' + (resto < 0 ? fmt(-resto) + ' oltre l\'obiettivo' : fmt(resto) + ' rimanenti') + '</div></div>';
-  }
-  function aggiornaSelezioneTorta() {
-    $('centro-torta').innerHTML = centroTorta(stato.giorno);
-    document.querySelectorAll('.fetta, #legenda-torta span[data-cat]').forEach((el) =>
-      el.classList.toggle('spenta', !!stato.catSel && el.dataset.cat !== stato.catSel));
-  }
-  function impostaTorta() {
-    const scegli = (cat) => { stato.catSel = stato.catSel === cat ? null : cat; aggiornaSelezioneTorta(); };
-    document.querySelectorAll('.fetta, #legenda-torta span[data-cat]').forEach((el) => el.onclick = (e) => { e.stopPropagation(); scegli(el.dataset.cat); });
-    const area = $('area-torta');
-    if (area) area.onclick = () => { if (stato.catSel) { stato.catSel = null; aggiornaSelezioneTorta(); } };
-    if (stato.catSel && !stato.giorno.categorie.some((c) => c.nome === stato.catSel && c.kcal > 0)) stato.catSel = null;
-    aggiornaSelezioneTorta();
-  }
-
-  function torta(categorie) {
-    const r = 46, c = 2 * Math.PI * r;
-    const valori = categorie.filter((x) => x.kcal > 0), totale = valori.reduce((s, x) => s + x.kcal, 0);
-    let svg = '<svg viewBox="0 0 120 120" role="img" class="svg-torta"><circle cx="60" cy="60" r="' + r + '" fill="none" stroke="#EADFD3" stroke-width="16"/>';
-    let offset = 0;
-    valori.forEach((x) => {
-      const len = (x.kcal / totale) * c;
-      svg += '<circle class="fetta" data-cat="' + esc(x.nome) + '" cx="60" cy="60" r="' + r + '" fill="none" stroke="' + (COLORI[x.nome] || '#ccc') + '" stroke-width="16" stroke-dasharray="' +
-        Math.max(len - 0.8, 0.1) + ' ' + c + '" stroke-dashoffset="' + (-offset) + '" transform="rotate(-90 60 60)"><title>' + esc(x.nome) + ': ' + fmt(x.kcal) + ' kcal</title></circle>';
-      offset += len;
-    });
-    return svg + '</svg>';
   }
 
   // Salvataggi "ottimisti": la schermata si aggiorna subito, il foglio in sottofondo

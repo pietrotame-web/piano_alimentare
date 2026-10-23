@@ -523,7 +523,6 @@
       '<div><strong>' + fmt(g.totale.grassi) + ' g</strong><span>Grassi</span></div></div>';
     html += '<div class="scatola">' + g.pasti.map((p, i) =>
       '<button class="pasto" data-pasto="' + i + '"' + (lettura() ? ' disabled' : '') + '><h2>' + esc(p.nome) + '</h2>' +
-      '<span class="kcal">' + (p.alimenti.length ? macroBreve(p) : '') + '</span>' +
       '<div class="scelti">' + (p.alimenti.length ? p.alimenti.map((a) => '<span class="chip">' + esc(a) + etichettaQta(a, (p.quantita || {})[a], p.nome) + '</span>').join('')
         : '<span class="vuoto">' + (lettura() ? 'Niente' : 'Tocca per scegliere gli alimenti') + '</span>') + '</div></button>').join('') + '</div>';
     html += '<div class="etichetta-sezione">Allenamento' + (lettura() ? ' <span class="distintivo">Sola lettura</span>' : '') + '</div><div class="allenamento">' +

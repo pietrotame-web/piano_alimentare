@@ -80,11 +80,8 @@
   .riga-impostazione + .campo-email { padding: 0 16px 14px; }
 
   /* Diario */
-  /* Grafico del giorno: kcal totali + grammi dei macronutrienti */
+  /* Grafico del giorno: grammi dei macronutrienti */
   .grafico-giorno { display: flex; flex-direction: column; align-items: center; padding: 20px 16px 0; }
-  .kcal-giorno { text-align: center; margin-bottom: 16px; }
-  .kcal-giorno .numero { font-family: var(--titoli); font-weight: 800; font-size: clamp(44px, 13vw, 58px); line-height: 1; letter-spacing: -0.03em; }
-  .kcal-giorno .di { font-size: 14px; color: var(--inchiostro-tenue); margin-top: 4px; }
   .titolo-grafico { margin: 0 0 12px; font-family: var(--titoli); font-weight: 700; font-size: 17px; text-align: center; }
   .area-grafico { position: relative; width: 100%; height: min(72vw, 280px); display: grid; place-items: center; }
   .area-grafico > svg.barre { width: 100%; height: min(72vw, 280px); overflow: visible; display: block; }
@@ -197,12 +194,12 @@
   .pannello footer { padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 12px); border-top: 1px solid var(--linea); background: var(--crema); display: grid; gap: 8px; }
   .selezionati { padding: 4px 16px 8px; max-height: 36vh; overflow-y: auto; }
   .selezionati .titoletto { font-size: 12px; font-weight: 700; color: var(--inchiostro-tenue); margin: 2px 0 6px; }
-  .sel-riga { display: grid; grid-template-columns: 1fr 74px 26px 52px 30px; align-items: center; gap: 6px; padding: 6px 10px; background: var(--burro-chiaro); border: 1px solid var(--burro); border-radius: 12px; margin-bottom: 6px; }
+  .sel-riga { display: grid; grid-template-columns: 1fr 74px 26px 30px; align-items: center; gap: 6px; padding: 6px 10px; background: var(--burro-chiaro); border: 1px solid var(--burro); border-radius: 12px; margin-bottom: 6px; }
   .sel-riga .nome { font-size: 14px; font-weight: 600; line-height: 1.25; }
   .sel-riga input { width: 100%; padding: 7px 8px; border-radius: 9px; border: 1px solid var(--linea); background: var(--carta); text-align: right; font-size: 16px; color: var(--inchiostro); }
   .sel-riga input.modificata { border-color: var(--inchiostro); font-weight: 700; }
   .sel-riga .unita { font-size: 13px; color: var(--inchiostro-tenue); }
-  .sel-riga .kc { font-size: 12px; color: var(--inchiostro-tenue); text-align: right; white-space: nowrap; }
+  .sel-riga .kc { grid-column: 1 / -1; grid-row: 2; font-size: 12px; color: var(--inchiostro-tenue); margin-top: -2px; }
   .sel-riga button { font-size: 18px; line-height: 1; color: var(--inchiostro-tenue); }
   .selezionati .chip { background: var(--burro-chiaro); border-color: var(--burro); display: inline-flex; align-items: center; gap: 6px; }
   .selezionati .chip button { font-size: 16px; line-height: 1; padding: 0 2px; }
@@ -519,14 +516,14 @@
 
   function disegnaGiorno() {
     const g = stato.giorno;
-    let html = '<div class="grafico-giorno"><div class="kcal-giorno"><div class="numero">' + fmt(g.totale.kcal) + '</div><div class="di">kcal</div></div>' +
+    let html = '<div class="grafico-giorno">' +
       '<h3 class="titolo-grafico">Macronutrienti (g)</h3><div class="area-grafico">' + graficoGrammi(g.totale) + '</div></div>';
     html += '<div class="macro"><div><strong>' + fmt(g.totale.proteine) + ' g</strong><span>Proteine</span></div>' +
       '<div><strong>' + fmt(g.totale.carboidrati) + ' g</strong><span>Carboidrati</span></div>' +
       '<div><strong>' + fmt(g.totale.grassi) + ' g</strong><span>Grassi</span></div></div>';
     html += '<div class="scatola">' + g.pasti.map((p, i) =>
       '<button class="pasto" data-pasto="' + i + '"' + (lettura() ? ' disabled' : '') + '><h2>' + esc(p.nome) + '</h2>' +
-      '<span class="kcal">' + (p.alimenti.length ? fmt(p.kcal) + ' <small>kcal</small>' : '') + '</span>' +
+      '<span class="kcal">' + (p.alimenti.length ? macroBreve(p) : '') + '</span>' +
       '<div class="scelti">' + (p.alimenti.length ? p.alimenti.map((a) => '<span class="chip">' + esc(a) + etichettaQta(a, (p.quantita || {})[a], p.nome) + '</span>').join('')
         : '<span class="vuoto">' + (lettura() ? 'Niente' : 'Tocca per scegliere gli alimenti') + '</span>') + '</div></button>').join('') + '</div>';
     html += '<div class="etichetta-sezione">Allenamento' + (lettura() ? ' <span class="distintivo">Sola lettura</span>' : '') + '</div><div class="allenamento">' +
@@ -644,6 +641,11 @@
     return svg + '</svg>';
   }
 
+  // Grammi di proteine, carboidrati e grassi in breve (le calorie non si mostrano)
+  function macroBreve(v) {
+    return 'P ' + fmt(v.proteine) + ' · C ' + fmt(v.carboidrati) + ' · G ' + fmt(v.grassi) + ' <small>g</small>';
+  }
+  function kcalDaMacro(v) { return Math.round((v.pr * 4 + v.ca * 4 + v.gr * 9) * 100) / 100; }
   function etichettaQta(nome, pers, pasto) {
     const a = ingrediente(nome);
     if (!a) return '';
@@ -725,7 +727,7 @@
     const testoCerca = $('cerca').value.trim();
     const nuova = '<button class="voce-nuova" id="voce-nuova"><span class="piu">+</span><span>' +
       (testoCerca && !html ? 'Aggiungi «' + esc(testoCerca) + '» a mano' : 'Alimento o pasto personalizzato') +
-      '<small>Scrivi tu quantità e calorie, lo ritrovi poi tra gli ingredienti</small></span></button>';
+      '<small>Scrivi tu quantità e grammi, lo ritrovi poi tra gli ingredienti</small></span></button>';
     $('lista-alimenti').innerHTML = (html ? '' : '<p class="vuoto">Nessun alimento trovato.</p>') + nuova + html;
     $('voce-nuova').onclick = () => nuovoPersonalizzato(testoCerca);
     $('lista-alimenti').querySelectorAll('.voce').forEach((b) => b.onclick = () => alterna(b.dataset.nome, b));
@@ -739,22 +741,23 @@
       '<label class="campo"><span>Nome</span><input id="p-n" value="' + esc(nomeIniziale || '') + '" placeholder="es. Pizza margherita" autocomplete="off"></label>' +
       '<div class="griglia2"><label class="campo"><span>Categoria</span><select id="p-c">' + cats.map((c) => '<option' + (c === catIniziale ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></label>' +
       '<label class="campo"><span>Unità</span><select id="p-u"><option value="g">grammi</option><option value="ml">ml</option><option value="pz">pezzi / porzioni</option></select></label></div>' +
-      '<div class="griglia2">' + num('p-q', 'Quantità mangiata', 'es. 250') + num('p-k', 'Kcal totali', 'es. 600') + '</div>' +
-      '<p class="nota">Facoltativi, sempre riferiti alla quantità mangiata:</p>' +
+      '<div class="griglia2">' + num('p-q', 'Quantità mangiata', 'es. 250') + '</div>' +
+      '<p class="nota">Grammi riferiti alla quantità mangiata:</p>' +
       '<div class="griglia2">' + num('p-pr', 'Proteine (g)') + num('p-ca', 'Carboidrati (g)') + num('p-gr', 'Grassi (g)') + '</div>' +
-      '<p class="nota">Viene aggiunto al pasto e salvato tra gli Ingredienti, così la prossima volta lo trovi nella lista. Se un altro giorno ne mangi una quantità diversa, cambiala accanto al nome: le calorie si ricalcolano in proporzione.</p>';
+      '<p class="nota">Viene aggiunto al pasto e salvato tra gli Ingredienti, così la prossima volta lo trovi nella lista. Se un altro giorno ne mangi una quantità diversa, cambiala accanto al nome: i grammi si ricalcolano in proporzione.</p>';
     apriFoglio('Alimento personalizzato', corpo, '<button class="bottone largo" id="p-salva">Aggiungi al pasto</button>');
     if (!nomeIniziale) setTimeout(() => $('p-n').focus(), 300);
     const n = (id) => { const v = $(id).value.trim().replace(',', '.'); return v === '' ? 0 : Number(v); };
     $('p-salva').onclick = async () => {
       const nome = $('p-n').value.trim(), u = $('p-u').value, q = n('p-q');
-      const val = { k: n('p-k'), pr: n('p-pr'), ca: n('p-ca'), gr: n('p-gr') };
+      const val = { pr: n('p-pr'), ca: n('p-ca'), gr: n('p-gr') };
       if (!nome) { avviso('Scrivi il nome.'); return; }
       if (/[,;=|]/.test(nome)) { avviso('Il nome non può contenere virgole, punti e virgola, = o |.'); return; }
       if (ingrediente(nome)) { avviso('Esiste già un alimento con questo nome: cercalo nella lista.'); return; }
       if (!(q > 0)) { avviso('Scrivi la quantità mangiata.'); return; }
-      if (!(val.k > 0)) { avviso('Scrivi le calorie.'); return; }
       if (Object.values(val).some((x) => isNaN(x) || x < 0)) { avviso('Controlla i numeri: devono essere positivi.'); return; }
+      if (!(val.pr + val.ca + val.gr > 0)) { avviso('Scrivi almeno i grammi di un macronutriente.'); return; }
+      val.k = kcalDaMacro(val);  // il foglio vuole anche le kcal: le ricavo dai grammi
       // Il foglio vuole i valori per 100 g/ml o per 1 pezzo: converto da quelli della quantità mangiata
       const f = u === 'pz' ? 1 / q : 100 / q;
       const per = (x) => Math.round(x * f * 100) / 100;
@@ -786,10 +789,9 @@
       if (!a) return '';
       const cons = quantitaConsigliata(a, pasto);
       const pers = stato.qta[n];
-      const kcal = valoriPorzione(a, pasto, pers).kcal;
       return '<div class="sel-riga" data-nome="' + esc(n) + '"><span class="nome">' + esc(n) + '</span>' +
         '<input inputmode="decimal" aria-label="Quantità di ' + esc(n) + '" placeholder="' + esc(fmt(cons, 1)) + '" value="' + (pers !== undefined ? esc(String(pers).replace('.', ',')) : '') + '"' + (pers !== undefined ? ' class="modificata"' : '') + '>' +
-        '<span class="unita">' + esc(a.u) + '</span><span class="kc">' + fmt(kcal) + ' kcal</span>' +
+        '<span class="unita">' + esc(a.u) + '</span><span class="kc">' + macroBreve(valoriPorzione(a, pasto, pers)) + '</span>' +
         '<button aria-label="Togli ' + esc(n) + '">×</button></div>';
     }).join('');
     $('selezionati').innerHTML = stato.scelta.length
@@ -803,7 +805,7 @@
         if (v !== '' && isFinite(n) && n > 0) { stato.qta[nome] = n; input.classList.add('modificata'); }
         else { delete stato.qta[nome]; input.classList.remove('modificata'); }
         const a = ingrediente(nome);
-        r.querySelector('.kc').textContent = fmt(valoriPorzione(a, pasto, stato.qta[nome]).kcal) + ' kcal';
+        r.querySelector('.kc').innerHTML = macroBreve(valoriPorzione(a, pasto, stato.qta[nome]));
       };
       r.querySelector('button').onclick = () => {
         alterna(nome);
@@ -920,7 +922,7 @@
           const nCom = g && g.commenti ? g.commenti.length : 0;
           return '<div class="riga"><button class="principale" data-giorno="' + iso + '" style="text-align:left"><b>' + esc(etichetta(iso).giorno) +
             (all ? '<span class="icone-all">' + all + '</span>' : '') + (nCom ? '<span class="icone-all" style="color:var(--inchiostro-tenue)">💬 ' + nCom + '</span>' : '') + '</b><small>' + (g ? g.pasti.filter((p) => p.alimenti.length).length + ' pasti su 5' : 'caricamento…') + '</small></button>' +
-            '<span class="valore">' + (g ? fmt(g.totale.kcal) + ' <small>kcal</small>' : '') + '</span>' +
+            '<span class="valore">' + (g && g.totale.kcal ? macroBreve(g.totale) : '') + '</span>' +
             (lettura() ? '' : '<button class="x" data-elimina="' + iso + '" aria-label="Elimina ' + esc(etichetta(iso).giorno) + '">×</button>') + '</div>';
         }).join('') : '<p class="vuoto" style="padding:0 16px">Nessun giorno in questo mese.</p>') + '</div>';
         if (!lettura()) html += '<div style="padding:12px 16px 16px"><button class="bottone pericolo largo" data-elimina-mese="' + esc(m.nome) + '">Elimina ' + esc(m.nome) + '</button></div>';
@@ -1000,10 +1002,8 @@
       if (!gruppo.length) return;
       html += '<div class="gruppo"><i style="background:' + (COLORI[cat] || '#ccc') + '"></i>' + esc(cat) + '</div><div class="scatola" style="margin-top:4px">' +
         gruppo.map((a) => {
-          const fissa = a.p !== '' && a.p !== null;
-          const kcal = fissa ? valoriPorzione(a, '').kcal : null;
           return '<button class="riga" data-ing="' + esc(a.n) + '"><span class="principale"><b>' + esc(a.n) + '</b><small>' + esc(porzione(a)) +
-            ' · ' + fmt(a.k, 1) + ' kcal per ' + (a.u === 'pz' ? 'pezzo' : '100 ' + a.u) + '</small>' + (a.f ? '<span class="fonte' + (/^verificato/i.test(a.f) ? ' ok' : '') + '">' + (/^verificato/i.test(a.f) ? '✓ ' : '') + esc(a.f) + '</span>' : '') + '</span><span class="valore">' + (kcal !== null ? fmt(kcal) + ' <small>kcal</small>' : '') + '</span></button>';
+            ' · P ' + fmt(a.pr, 1) + ' · C ' + fmt(a.ca, 1) + ' · G ' + fmt(a.gr, 1) + ' g per ' + (a.u === 'pz' ? 'pezzo' : '100 ' + a.u) + '</small>' + (a.f ? '<span class="fonte' + (/^verificato/i.test(a.f) ? ' ok' : '') + '">' + (/^verificato/i.test(a.f) ? '✓ ' : '') + esc(a.f) + '</span>' : '') + '</span></button>';
         }).join('') + '</div>';
     });
     $('elenco-ing').innerHTML = html || '<p class="vuoto centrato">Nessun ingrediente trovato.</p>';
@@ -1020,7 +1020,7 @@
       '<label class="campo"><span>Unità</span><select id="i-u"' + dis + '>' + ['g', 'ml', 'pz'].map((u) => '<option' + (u === a.u ? ' selected' : '') + '>' + u + '</option>').join('') + '</select></label></div>' +
       '<label class="campo"><span>Porzione dal piano (vuota = quantità del pasto nel Piano)</span><input id="i-p" inputmode="decimal" value="' + esc(a.p) + '" placeholder="dal piano"' + dis + '></label>' +
       '<p class="nota">Valori nutrizionali per 100 g o 100 ml, oppure per 1 pezzo se l\'unità è pz.</p>' +
-      '<div class="griglia2">' + num('i-k', 'Kcal', a.k) + num('i-pr', 'Proteine (g)', a.pr) + num('i-ca', 'Carboidrati (g)', a.ca) + num('i-gr', 'Grassi (g)', a.gr) + '</div>' +
+      '<div class="griglia2">' + num('i-pr', 'Proteine (g)', a.pr) + num('i-ca', 'Carboidrati (g)', a.ca) + num('i-gr', 'Grassi (g)', a.gr) + '</div>' +
       '<label class="campo"><span>Fonte dei valori</span><input id="i-f" value="' + esc(a.f || '') + '" placeholder="es. etichetta del prodotto, tabelle CREA" autocomplete="off"' + dis + '></label>' +
       (nome && !lettura() ? '<p class="nota">Se cambi il nome, viene aggiornato anche nei pasti già registrati.</p>' : '');
     const azioni = lettura() ? '' : '<button class="bottone largo" id="i-salva">Salva</button>' + (nome ? '<button class="bottone pericolo largo" id="i-elimina">Elimina ingrediente</button>' : '');
@@ -1028,9 +1028,11 @@
     if (lettura()) return;
     const n = (id) => { const v = $(id).value.trim().replace(',', '.'); return v === '' ? '' : Number(v); };
     $('i-salva').onclick = async () => {
-      const d = { n: $('i-n').value.trim(), c: $('i-c').value, u: $('i-u').value, p: n('i-p'), k: n('i-k') || 0, pr: n('i-pr') || 0, ca: n('i-ca') || 0, gr: n('i-gr') || 0, f: $('i-f').value.trim() };
+      const d = { n: $('i-n').value.trim(), c: $('i-c').value, u: $('i-u').value, p: n('i-p'), pr: n('i-pr') || 0, ca: n('i-ca') || 0, gr: n('i-gr') || 0, f: $('i-f').value.trim() };
       if (!d.n) { avviso('Scrivi il nome dell\'ingrediente.'); return; }
-      if ([d.p, d.k, d.pr, d.ca, d.gr].some((x) => x !== '' && (isNaN(x) || x < 0))) { avviso('Controlla i numeri: devono essere positivi.'); return; }
+      // Le kcal non si mostrano: restano quelle salvate, o si ricavano dai grammi se questi cambiano
+      d.k = nome && d.pr === a.pr && d.ca === a.ca && d.gr === a.gr ? a.k : kcalDaMacro(d);
+      if ([d.p, d.pr, d.ca, d.gr].some((x) => x !== '' && (isNaN(x) || x < 0))) { avviso('Controlla i numeri: devono essere positivi.'); return; }
       attesa(true);
       try {
         const j = await invia({ action: 'salvaIngrediente', originale: nome || '', ingrediente: d });
@@ -1041,7 +1043,7 @@
       finally { attesa(false); }
     };
     if ($('i-elimina')) $('i-elimina').onclick = async () => {
-      if (!confirm('Eliminare "' + nome + '"? Nei giorni in cui l\'hai già scelto resterà scritto, ma non conterà più calorie.')) return;
+      if (!confirm('Eliminare "' + nome + '"? Nei giorni in cui l\'hai già scelto resterà scritto, ma non conterà più nei totali.')) return;
       attesa(true);
       try {
         const j = await invia({ action: 'eliminaIngrediente', nome: nome });
@@ -1058,7 +1060,7 @@
     const ob = stato.dati.obiettivi, dis = lettura() ? ' disabled' : '';
     let notificheHtml = '';
     let html = '<div class="etichetta-sezione">Obiettivi giornalieri</div><div class="scatola">' +
-      [['kcal', 'Kcal'], ['proteine', 'Proteine (g)'], ['carboidrati', 'Carboidrati (g)'], ['grassi', 'Grassi (g)']].map((x) =>
+      [['proteine', 'Proteine (g)'], ['carboidrati', 'Carboidrati (g)'], ['grassi', 'Grassi (g)']].map((x) =>
         '<div class="riga-piano"><span>' + x[1] + '</span><input data-ob="' + x[0] + '" inputmode="decimal" value="' + esc(ob[x[0]]) + '"' + dis + '></div>').join('') + '</div>';
     html += '<div class="etichetta-sezione">Quantità per pasto</div><div class="scatola">';
     let ultimoPasto = null;
@@ -1109,7 +1111,7 @@
     $('salva-notifiche').onclick = () => salvaNotifiche(true);
     $('salva-piano').onclick = async () => {
       const leggi = (el) => { const v = el.value.trim().replace(',', '.'); return v === '' ? '' : Number(v); };
-      const obiettivi = {};
+      const obiettivi = { kcal: stato.dati.obiettivi.kcal };  // non si mostra, resta quello del foglio
       document.querySelectorAll('[data-ob]').forEach((el) => { obiettivi[el.dataset.ob] = leggi(el); });
       const quantita = stato.dati.schema.map((r) => r.quantita);
       document.querySelectorAll('[data-q]').forEach((el) => { quantita[Number(el.dataset.q)] = leggi(el); });

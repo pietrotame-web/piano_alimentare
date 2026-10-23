@@ -85,8 +85,6 @@
   .kcal-giorno { text-align: center; margin-bottom: 16px; }
   .kcal-giorno .numero { font-family: var(--titoli); font-weight: 800; font-size: clamp(44px, 13vw, 58px); line-height: 1; letter-spacing: -0.03em; }
   .kcal-giorno .di { font-size: 14px; color: var(--inchiostro-tenue); margin-top: 4px; }
-  .kcal-giorno .resto { font-size: 13px; margin-top: 2px; font-weight: 600; }
-  .kcal-giorno .resto.sopra { color: var(--rosso); }
   .titolo-grafico { margin: 0 0 12px; font-family: var(--titoli); font-weight: 700; font-size: 17px; text-align: center; }
   .area-grafico { position: relative; width: 100%; height: min(72vw, 280px); display: grid; place-items: center; }
   .area-grafico > svg.barre { width: 100%; height: min(72vw, 280px); overflow: visible; display: block; }
@@ -520,10 +518,8 @@
   }
 
   function disegnaGiorno() {
-    const g = stato.giorno, ob = stato.dati.obiettivi;
-    const kcal = g.totale.kcal, resto = ob.kcal - kcal;
-    let html = '<div class="grafico-giorno"><div class="kcal-giorno"><div class="numero">' + fmt(kcal) + '</div><div class="di">di ' + fmt(ob.kcal) + ' kcal</div>' +
-      '<div class="resto' + (resto < 0 ? ' sopra' : '') + '">' + (resto < 0 ? fmt(-resto) + ' oltre l\'obiettivo' : fmt(resto) + ' rimanenti') + '</div></div>' +
+    const g = stato.giorno;
+    let html = '<div class="grafico-giorno"><div class="kcal-giorno"><div class="numero">' + fmt(g.totale.kcal) + '</div><div class="di">kcal</div></div>' +
       '<h3 class="titolo-grafico">Macronutrienti (g)</h3><div class="area-grafico">' + graficoGrammi(g.totale) + '</div></div>';
     html += '<div class="macro"><div><strong>' + fmt(g.totale.proteine) + ' g</strong><span>Proteine</span></div>' +
       '<div><strong>' + fmt(g.totale.carboidrati) + ' g</strong><span>Carboidrati</span></div>' +

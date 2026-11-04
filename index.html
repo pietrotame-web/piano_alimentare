@@ -415,6 +415,18 @@
 
 <script>
 (function () {
+  // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
+  const VERSIONE = '2026-11-04-1';
+  async function controllaAggiornamento() {
+    try {
+      const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return;
+      const m = /const VERSIONE = '([^']+)'/.exec(await r.text());
+      if (m && m[1] !== VERSIONE) location.replace(location.pathname + '?v=' + encodeURIComponent(m[1]) + location.hash);
+    } catch (e) { /* offline: si riprova alla prossima apertura */ }
+  }
+  controllaAggiornamento();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') controllaAggiornamento(); });
   const COLORI = { 'Carboidrati': '#F5B95C', 'Proteine': '#F2876B', 'Verdure': '#5CC283', 'Frutta': '#F07EA1', 'Latticini': '#6FC3E6', 'Grassi': '#B28C6E', 'Extra': '#9E85F4' };
   const GIORNI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
   const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];

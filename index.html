@@ -884,7 +884,8 @@
     const nuova = '<button class="voce-nuova" id="voce-nuova"><span class="piu">+</span><span>' +
       (testoCerca && !html ? 'Aggiungi «' + esc(testoCerca) + '» a mano' : 'Alimento o pasto personalizzato') +
       '<small>Scrivi tu quantità e grammi, lo ritrovi poi tra gli ingredienti</small></span></button>';
-    const marca = '<button class="voce-nuova" id="voce-marca"><span class="piu">' + ICONE.cerca + '</span><span>Prodotto di marca' +
+    const marca = '<button class="voce-nuova" id="voce-marca"><span class="piu">' + ICONE.cerca + '</span><span>' +
+      (testoCerca ? 'Cerca «' + esc(testoCerca) + '» tra i prodotti di marca' : 'Prodotto di marca') +
       '<small>Cerca per nome o codice a barre, con i valori dell\'etichetta</small></span></button>';
     $('lista-alimenti').innerHTML = (html ? '' : '<p class="vuoto">Nessun alimento trovato.</p>') + marca + nuova + html;
     $('voce-nuova').onclick = () => nuovoPersonalizzato(testoCerca);

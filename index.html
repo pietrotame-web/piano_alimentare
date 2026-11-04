@@ -1042,7 +1042,8 @@
   };
 
   /* ---------- Pannello generico ---------- */
-  function apriFoglio(titolo, corpo, azioni) {
+  function apriFoglio(titolo, corpo, azioni, alto) {
+    $('foglio').classList.toggle('alto', !!alto);
     $('foglio-titolo').textContent = titolo;
     $('foglio-corpo').innerHTML = corpo;
     $('foglio-azioni').innerHTML = azioni || '';
@@ -1072,6 +1073,30 @@
       throw new Error(e.name === 'AbortError' ? 'Open Food Facts è lento a rispondere. Riprova tra poco.' : (e.message || 'Connessione non riuscita.'));
     } finally { clearTimeout(t); }
   }
+  // Ricerche già fatte: la stessa ricerca ripetuta non disturba di nuovo il server
+  const ricercheOff = {};
+  const attendi = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  async function cercaOff(q) {
+    const chiave = q.toLowerCase().replace(/\s+/g, ' ');
+    if (ricercheOff[chiave]) return ricercheOff[chiave];
+    const tentativi = [
+      // ricerca classica di Open Food Facts (prodotti venduti in Italia)
+      async () => (await chiediOff('https://it.openfoodfacts.org/cgi/search.pl?search_simple=1&action=process&json=1&page_size=20&search_terms=' +
+        encodeURIComponent(q) + '&fields=' + OFF_CAMPI)).products,
+      // motore di ricerca nuovo di Open Food Facts, usato se il primo non risponde
+      async () => (await chiediOff('https://search.openfoodfacts.org/search?langs=it&page_size=20&q=' + encodeURIComponent(q) + '&fields=' + OFF_CAMPI)).hits
+    ];
+    let errore = null;
+    for (let i = 0; i < tentativi.length; i++) {
+      try {
+        const lista = (await tentativi[i]()) || [];
+        const prodotti = lista.map((p) => Object.assign({}, p, { brands: Array.isArray(p.brands) ? p.brands.join(', ') : p.brands }));
+        if (prodotti.length || i === tentativi.length - 1) { ricercheOff[chiave] = prodotti; return prodotti; }
+      } catch (e) { errore = e; await attendi(700); }
+    }
+    throw new Error('Open Food Facts non risponde in questo momento. Succede se si fanno tante ricerche di fila: aspetta un minuto e riprova.' +
+      (errore && errore.message ? ' (' + errore.message + ')' : ''));
+  }
   function valoriOff(p) {
     const n = p.nutriments || {};
     const num = (k) => { const v = Number(n[k]); return isFinite(v) && n[k] !== '' && n[k] !== undefined ? Math.round(v * 10) / 10 : null; };
@@ -1089,7 +1114,7 @@
       '<div id="m-scan" class="area-scan nascosto"></div>' +
       '<div id="m-ris" class="risultati-marca"></div>' +
       '<p class="nota" style="margin-top:14px">Dati da <a href="https://it.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a>, database aperto (licenza ODbL) compilato dagli utenti: controlla sempre i valori con l\'etichetta.</p>';
-    apriFoglio('Prodotto di marca', corpo, '');
+    apriFoglio('Prodotto di marca', corpo, '', true);
     const vai = async () => {
       const q = $('m-q').value.trim();
       if (!q) { avviso('Scrivi cosa cercare.'); return; }
@@ -1097,9 +1122,7 @@
       $('m-vai').disabled = true;
       $('m-ris').innerHTML = '<p class="vuoto">Cerco…</p>';
       try {
-        const j = await chiediOff('https://it.openfoodfacts.org/cgi/search.pl?search_simple=1&action=process&json=1&page_size=20&search_terms=' +
-          encodeURIComponent(q) + '&fields=' + OFF_CAMPI);
-        mostraRisultati(j.products || []);
+        mostraRisultati(await cercaOff(q));
       } catch (e) { $('m-ris').innerHTML = '<p class="vuoto">' + esc(e.message) + '</p>'; }
       finally { if ($('m-vai')) $('m-vai').disabled = false; }
     };
@@ -1123,7 +1146,9 @@
     const ris = $('m-ris');
     if (ris) ris.innerHTML = '<p class="vuoto">Cerco il codice ' + esc(codice) + '…</p>';
     try {
-      const j = await chiediOff('https://world.openfoodfacts.org/api/v2/product/' + encodeURIComponent(codice) + '.json?fields=' + OFF_CAMPI);
+      const url = 'https://world.openfoodfacts.org/api/v2/product/' + encodeURIComponent(codice) + '.json?fields=' + OFF_CAMPI;
+      let j;
+      try { j = await chiediOff(url); } catch (e) { await attendi(800); j = await chiediOff(url); }
       if (j.status !== 1 || !j.product) { if ($('m-ris')) $('m-ris').innerHTML = '<p class="vuoto">Il codice ' + esc(codice) + ' non è nel database. Puoi inserirlo a mano con «Alimento o pasto personalizzato».</p>'; return; }
       if (!j.product.code) j.product.code = codice;
       schedaProdotto(j.product);
@@ -1179,7 +1204,7 @@
       '<p class="nota">Valori per 100 g o 100 ml, dall\'etichetta. Se non corrispondono alla tua confezione, correggili qui.</p>' +
       '<div class="griglia2">' + num('o-pr', 'Proteine (g)', v.pr) + num('o-ca', 'Carboidrati (g)', v.ca) + num('o-gr', 'Grassi (g)', v.gr) + '</div>' +
       '<p class="nota">Dati da Open Food Facts (licenza ODbL).</p>';
-    apriFoglio('Prodotto di marca', corpo, '<button class="bottone largo" id="o-salva">Aggiungi al pasto</button><button class="bottone secondario largo" id="o-indietro">Torna alla ricerca</button>');
+    apriFoglio('Prodotto di marca', corpo, '<button class="bottone largo" id="o-salva">Aggiungi al pasto</button><button class="bottone secondario largo" id="o-indietro">Torna alla ricerca</button>', true);
     $('o-indietro').onclick = () => cercaMarca($('cerca').value.trim());
     const n = (id) => { const x = $(id).value.trim().replace(',', '.'); return x === '' ? null : Number(x); };
     $('o-salva').onclick = async () => {

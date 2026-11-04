@@ -561,7 +561,9 @@
     stato.mesi = leggiLocale('mesi') || [];
     if (stato.dati && stato.giorni.length) { stato.corrente = stato.giorni[0]; mostraGiornoDaCache(); }
     else { $('testata').className = 'testata semplice'; $('testata').innerHTML = '<span></span><h1>Piano alimentare</h1><span></span>'; $('contenuto').innerHTML = '<div class="messaggio"><p>Caricamento dal foglio…</p></div>'; }
-    attesa(true);
+    // Con i dati già sul telefono l'aggiornamento dal foglio avviene in silenzio, senza la scritta in alto
+    const silenzioso = !!(stato.dati && stato.giorni.length);
+    if (!silenzioso) attesa(true);
     try {
       const j = await chiedi({ action: 'init' });
       stato.ruolo = daLink ? 'lettura' : j.ruolo;
@@ -585,7 +587,7 @@
         $('riprova').onclick = avvia;
         if ($('cambia')) $('cambia').onclick = mostraImpostazioni;
       } else avviso(e.message);
-    } finally { attesa(false); }
+    } finally { if (!silenzioso) attesa(false); }
   }
 
   function mostraImpostazioni() {

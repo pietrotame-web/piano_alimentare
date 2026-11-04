@@ -7,21 +7,23 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Piano">
-<meta name="theme-color" content="#F7F0E6">
+<meta name="theme-color" content="#F3F4F8">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.json">
 <title>Piano alimentare</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --crema: #F7F0E6; --carta: #FFFDF9; --salmone: #E6C3AF; --salmone-chiaro: #F1DDD0;
-    --burro: #F3DC8F; --burro-chiaro: #F8ECC4; --salvia: #CADFBE;
-    --inchiostro: #5B3A2E; --inchiostro-tenue: #8A6E62; --linea: #E8DCCF;
-    --verde: #6AA84F; --rosso: #CC4125;
-    --titoli: "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
-    --testo: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    --crema: #F3F4F8; --carta: #FFFFFF; --salmone: #DCD0FC; --salmone-chiaro: #EFEAFE;
+    --burro: #FFD99A; --burro-chiaro: #FFF4E0; --salvia: #CDEFD5;
+    --inchiostro: #15151A; --inchiostro-tenue: #8D8D99; --linea: #ECECF2;
+    --verde: #34B36B; --rosso: #EF4C46;
+    --viola: #8E72F2; --viola-chiaro: #EFEAFE; --menta: #BEEBC8; --cielo: #BDE6F4; --pesca: #FFD596;
+    --ombra: 0 8px 24px rgba(20, 20, 40, .06), 0 1px 3px rgba(20, 20, 40, .04);
+    --titoli: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    --testo: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
     --fascia: var(--salmone);
     --schede: calc(env(safe-area-inset-bottom, 0px) + 64px);
   }
@@ -226,6 +228,105 @@
   .avviso { position: fixed; left: 16px; right: 16px; bottom: calc(var(--schede) + 12px); z-index: 40; background: var(--inchiostro); color: var(--crema); padding: 13px 16px; border-radius: 14px; font-size: 15px; transform: translateY(calc(100% + 120px)); visibility: hidden; transition: transform .25s, visibility 0s linear .25s; }
   .avviso.visibile { transform: translateY(0); visibility: visible; transition: transform .25s; }
   .attesa { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 70px); left: 50%; transform: translateX(-50%); z-index: 30; background: var(--carta); border: 1px solid var(--linea); padding: 6px 14px; border-radius: 999px; font-size: 13px; color: var(--inchiostro-tenue); }
+
+  /* ===== Stile "card" chiaro con pastelli (solo grafica) ===== */
+  body { -webkit-font-smoothing: antialiased; letter-spacing: -0.005em; }
+  .testata { border-radius: 0 0 28px 28px; padding-bottom: 14px; }
+  .testata.semplice { background: var(--crema); border-bottom: 0; border-radius: 0; }
+  .testata h1 { font-weight: 800; font-size: 20px; letter-spacing: -0.02em; }
+  .testata h1 small { font-weight: 600; font-size: 12px; }
+  .tondo { background: rgba(255,255,255,.75); width: 40px; height: 40px; justify-self: center; box-shadow: 0 1px 2px rgba(20,20,40,.06); }
+  .testata.semplice .tondo { background: var(--carta); }
+  .tondo:active { background: #fff; }
+  .tondo svg { width: 20px; height: 20px; }
+  .pannello .tondo { background: var(--carta); }
+
+  /* Barra in basso: pillola nera fluttuante */
+  .schede {
+    left: 50%; right: auto; transform: translateX(-50%); width: min(calc(100% - 32px), 480px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); padding: 7px; border: 0; border-radius: 999px;
+    background: #15151A; box-shadow: 0 10px 30px rgba(20,20,40,.25); gap: 2px;
+  }
+  .scheda { color: #9A9AA6; border-radius: 999px; padding: 7px 0 6px; font-size: 10px; letter-spacing: 0; }
+  .scheda[aria-current="page"] { background: #fff; color: #15151A; }
+  .scheda svg { width: 20px; height: 20px; }
+  .scheda .contatore { top: 2px; box-shadow: 0 0 0 2px #15151A; }
+  :root { --schede: calc(env(safe-area-inset-bottom, 0px) + 80px); }
+
+  /* Schede bianche con ombra, senza bordi */
+  .scatola, .dieta-pasto { border: 0; border-radius: 24px; box-shadow: var(--ombra); }
+  .pasto, .riga, .riga-piano, .commento, .dieta-gruppo { border-color: var(--linea); }
+  .pasto { padding: 16px 18px; }
+  .pasto h2 { font-weight: 800; font-size: 17px; letter-spacing: -0.01em; }
+  .chip { background: var(--crema); border: 0; padding: 5px 12px; font-size: 13.5px; font-weight: 500; }
+  .chip .q.mod { color: var(--viola); }
+  .etichetta-sezione { margin: 26px 20px 2px; font-size: 17px; font-weight: 800; color: var(--inchiostro); letter-spacing: -0.01em; }
+
+  /* Grafico del giorno dentro una scheda */
+  .grafico-giorno { margin: 18px 16px 0; padding: 18px 14px 6px; background: var(--carta); border-radius: 24px; box-shadow: var(--ombra); }
+  .titolo-grafico { font-weight: 800; font-size: 16px; align-self: flex-start; margin-left: 4px; }
+
+  /* Riquadri macro pastello */
+  .macro { background: none; border: 0; gap: 10px; margin: 12px 16px 6px; }
+  .macro div { border-radius: 20px; padding: 14px 8px 12px; }
+  .macro div + div { border-left: 0; }
+  .macro div:nth-child(1) { background: var(--pesca); }
+  .macro div:nth-child(2) { background: var(--menta); }
+  .macro div:nth-child(3) { background: var(--cielo); }
+  .macro strong { font-weight: 800; font-size: 22px; }
+  .macro span { color: rgba(21,21,26,.65); font-weight: 600; font-size: 12px; }
+
+  /* Interruttori */
+  .interruttore { border: 0; border-radius: 20px; box-shadow: var(--ombra); padding: 16px; }
+  .interruttore[aria-pressed="true"] .levetta { background: var(--viola); }
+
+  /* Elenchi */
+  .riga .principale b { font-weight: 700; }
+  .mese-titolo { font-weight: 800; font-size: 18px; }
+  .cerca { border: 0; border-radius: 16px; background: var(--carta); box-shadow: var(--ombra); padding: 13px 16px; }
+  .pannello .cerca { box-shadow: none; }
+  .filtro { border: 0; background: var(--carta); box-shadow: 0 1px 3px rgba(20,20,40,.06); font-weight: 600; font-size: 13.5px; padding: 8px 14px; }
+  .filtro[aria-pressed="true"] { background: var(--inchiostro); color: #fff; }
+  .gruppo { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+  .icone-all { color: var(--viola); }
+
+  /* Moduli */
+  .campo input, .campo select, .riga-piano input, .scrivi-commento textarea, .impostazioni input { border: 1px solid var(--linea); border-radius: 14px; background: var(--crema); }
+  .riga-piano input { border-radius: 12px; }
+  .campo input[disabled], .campo select[disabled] { background: var(--crema); }
+
+  /* Pulsanti a pillola */
+  .bottone { border-radius: 999px; padding: 14px 24px; font-weight: 700; color: #fff; }
+  .bottone.secondario { background: var(--carta); border: 1px solid var(--linea); color: var(--inchiostro); }
+  .bottone.pericolo { background: var(--carta); border: 1px solid #F7C6C3; }
+  .avviso-commenti { background: var(--viola-chiaro); border: 0; border-radius: 20px; }
+  .avviso-commenti button { border-radius: 999px; color: #fff; padding: 8px 14px; }
+  .commento.da-leggere { background: var(--viola-chiaro); }
+  .commento .chi .nuovo { background: var(--viola); }
+  .distintivo { border: 0; background: var(--viola-chiaro); color: var(--viola); }
+
+  /* Dieta */
+  .dieta-pasto h2 { font-weight: 800; font-size: 20px; letter-spacing: -0.01em; }
+  .dieta-gruppo li::before { background: var(--viola); }
+  .dieta-nota { background: var(--burro-chiaro); }
+  .bollino { background: var(--pesca); border-radius: 6px; padding: 1px 5px; }
+
+  /* Pannelli dal basso */
+  .velo { background: rgba(15,15,25,.35); }
+  .pannello { border-radius: 28px 28px 0 0; }
+  .pannello h3 { font-weight: 800; font-size: 21px; letter-spacing: -0.01em; }
+  .pannello footer { border-top: 0; }
+  .sel-riga { background: var(--carta); border: 0; border-radius: 16px; box-shadow: 0 1px 3px rgba(20,20,40,.06); padding: 8px 12px; }
+  .sel-riga input { background: var(--crema); border-radius: 10px; }
+  .sel-riga input.modificata { border-color: var(--viola); color: var(--viola); }
+  .voce .spunta { border-color: #CFCFDA; border-radius: 8px; }
+  .voce-nuova { border: 1.5px dashed #C9BCF8; border-radius: 16px; }
+  .voce-nuova .piu { border-radius: 8px; background: var(--viola); color: #fff; }
+
+  /* Varie */
+  .avviso { border-radius: 18px; color: #fff; box-shadow: 0 10px 30px rgba(20,20,40,.25); }
+  .attesa { border: 0; box-shadow: var(--ombra); }
+  .impostazioni h1 { font-weight: 800; letter-spacing: -0.03em; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -289,7 +390,7 @@
 
 <script>
 (function () {
-  const COLORI = { 'Carboidrati': '#E8B04F', 'Proteine': '#B5523B', 'Verdure': '#6AA84F', 'Frutta': '#E07B8C', 'Latticini': '#9FC5E8', 'Grassi': '#8E6E53', 'Extra': '#B4A7D6' };
+  const COLORI = { 'Carboidrati': '#F5B95C', 'Proteine': '#F2876B', 'Verdure': '#5CC283', 'Frutta': '#F07EA1', 'Latticini': '#6FC3E6', 'Grassi': '#B28C6E', 'Extra': '#9E85F4' };
   const GIORNI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
   const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
   const ICONE = {
@@ -627,15 +728,15 @@
   }
 
   function graficoGrammi(t) {
-    const voci = [['Proteine', t.proteine, '#B5523B'], ['Carboidrati', t.carboidrati, '#E8B04F'], ['Grassi', t.grassi, '#8E6E53']];
+    const voci = [['Proteine', t.proteine, '#FFC978'], ['Carboidrati', t.carboidrati, '#9EDDAE'], ['Grassi', t.grassi, '#9FD8EC']];
     const max = Math.max(1, ...voci.map((v) => v[1]));
     const H = 196, base = 238, larg = 76, passo = 116, x0 = (360 - (2 * passo + larg)) / 2;
-    let svg = '<svg class="barre" viewBox="0 0 360 270" preserveAspectRatio="xMidYMid meet" role="img"><line x1="' + (x0 - 16) + '" y1="' + base + '" x2="' + (360 - x0 + 16) + '" y2="' + base + '" stroke="#E8DCCF" stroke-width="1.5"/>';
+    let svg = '<svg class="barre" viewBox="0 0 360 270" preserveAspectRatio="xMidYMid meet" role="img"><line x1="' + (x0 - 16) + '" y1="' + base + '" x2="' + (360 - x0 + 16) + '" y2="' + base + '" stroke="#ECECF2" stroke-width="1.5"/>';
     voci.forEach((v, i) => {
       const h = Math.max(2, (v[1] / max) * H), x = x0 + i * passo;
-      svg += '<rect x="' + x + '" y="' + (base - h) + '" width="' + larg + '" height="' + h + '" rx="8" fill="' + v[2] + '"><title>' + v[0] + ': ' + fmt(v[1], 1) + ' g</title></rect>' +
-        '<text x="' + (x + larg / 2) + '" y="' + (base - h - 8) + '" text-anchor="middle" font-family="Bricolage Grotesque, -apple-system, sans-serif" font-weight="700" font-size="19" fill="#5B3A2E">' + fmt(v[1]) + ' g</text>' +
-        '<text x="' + (x + larg / 2) + '" y="' + (base + 24) + '" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="14" fill="#8A6E62">' + v[0] + '</text>';
+      svg += '<rect x="' + x + '" y="' + (base - h) + '" width="' + larg + '" height="' + h + '" rx="' + Math.min(18, h / 2) + '" fill="' + v[2] + '"><title>' + v[0] + ': ' + fmt(v[1], 1) + ' g</title></rect>' +
+        '<text x="' + (x + larg / 2) + '" y="' + (base - h - 8) + '" text-anchor="middle" font-family="Plus Jakarta Sans, -apple-system, sans-serif" font-weight="800" font-size="18" fill="#15151A">' + fmt(v[1]) + ' g</text>' +
+        '<text x="' + (x + larg / 2) + '" y="' + (base + 24) + '" text-anchor="middle" font-family="Plus Jakarta Sans, -apple-system, sans-serif" font-weight="600" font-size="13" fill="#8D8D99">' + v[0] + '</text>';
     });
     return svg + '</svg>';
   }

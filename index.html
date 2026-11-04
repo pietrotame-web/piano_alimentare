@@ -327,6 +327,28 @@
   .avviso { border-radius: 18px; color: #fff; box-shadow: 0 10px 30px rgba(20,20,40,.25); }
   .attesa { border: 0; box-shadow: var(--ombra); }
   .impostazioni h1 { font-weight: 800; letter-spacing: -0.03em; }
+
+  /* Striscia dei giorni (tondi) */
+  .striscia { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 6px; padding: 12px 4px 0; }
+  .striscia button { flex: 1; display: grid; justify-items: center; gap: 5px; padding: 0; color: rgba(21,21,26,.6); }
+  .striscia small { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .striscia span { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.7); color: var(--inchiostro); font-weight: 800; font-size: 16px; }
+  .striscia button[aria-current="date"] { color: var(--inchiostro); }
+  .striscia button[aria-current="date"] span { background: var(--inchiostro); color: #fff; box-shadow: 0 4px 12px rgba(20,20,40,.25); }
+
+  /* Pasti come schede separate */
+  .pasti { margin: 10px 16px 0; display: grid; gap: 10px; }
+  .pasti .pasto { background: var(--carta); border-radius: 22px; box-shadow: var(--ombra); grid-template-columns: 46px 1fr 36px; align-items: center; gap: 10px 12px; padding: 12px 14px; }
+  .pasti .pasto + .pasto { border-top: 0; }
+  .pasti .pasto:active:not([disabled]) { background: #FAFAFC; }
+  .icona-pasto { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; font-size: 22px; }
+  .icona-pasto.c0 { background: var(--viola-chiaro); } .icona-pasto.c1 { background: #FFEFD6; } .icona-pasto.c2 { background: #DDF5E3; }
+  .icona-pasto.c3 { background: #FFF3C9; } .icona-pasto.c4 { background: #DCEFF8; }
+  .testo-pasto { min-width: 0; display: grid; gap: 1px; }
+  .testo-pasto .vuoto { font-size: 13px; }
+  .piu-pasto { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--linea); display: grid; place-items: center; justify-self: end; color: var(--inchiostro); }
+  .piu-pasto svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.2; fill: none; stroke-linecap: round; }
+  .pasti .pasto .scelti { grid-column: 1 / -1; padding-left: 58px; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -581,11 +603,26 @@
     t.innerHTML = '<button class="tondo" id="prec" aria-label="Giorno precedente"' + (i < 0 || i >= stato.giorni.length - 1 ? ' disabled' : '') + '>' + ICONE.prec + '</button>' +
       '<h1>' + (e ? esc(e.giorno) + '<small>' + esc(e.mese) + '</small>' : 'Nessun giorno<small>' + (lettura() ? 'ancora niente da vedere' : 'aggiungine uno') + '</small>') + '</h1>' +
       '<button class="tondo" id="succ" aria-label="Giorno successivo"' + (i <= 0 ? ' disabled' : '') + '>' + ICONE.succ + '</button>' +
-      (lettura() ? '<span></span>' : '<button class="tondo" id="nuovo" aria-label="Aggiungi il giorno successivo">' + ICONE.piu + '</button>');
+      (lettura() ? '<span></span>' : '<button class="tondo" id="nuovo" aria-label="Aggiungi il giorno successivo">' + ICONE.piu + '</button>') +
+      striscia(i);
     if (iso) coloreFascia(iso);
+    t.querySelectorAll('[data-vai]').forEach((b) => b.onclick = () => vaiA(b.dataset.vai));
     $('prec').onclick = () => { const k = stato.giorni.indexOf(stato.corrente); if (k < stato.giorni.length - 1) vaiA(stato.giorni[k + 1]); };
     $('succ').onclick = () => { const k = stato.giorni.indexOf(stato.corrente); if (k > 0) vaiA(stato.giorni[k - 1]); };
     if ($('nuovo')) $('nuovo').onclick = nuovoGiorno;
+  }
+
+  // Cinque giorni tondi da toccare, in ordine dal più vecchio al più recente
+  function striscia(i) {
+    const n = stato.giorni.length;
+    if (!n || i < 0) return '';
+    const da = Math.max(0, Math.min(i - 2, n - 5));
+    const giorni = stato.giorni.slice(da, da + 5).reverse();
+    return '<div class="striscia">' + giorni.map((iso) => {
+      const d = dataDa(iso);
+      return '<button data-vai="' + iso + '"' + (iso === stato.corrente ? ' aria-current="date"' : '') + ' aria-label="' + esc(etichetta(iso).giorno) + '">' +
+        '<small>' + GIORNI[d.getDay()].slice(0, 3) + '</small><span>' + d.getDate() + '</span></button>';
+    }).join('') + '</div>';
   }
 
   function mostraGiornoDaCache() {
@@ -622,10 +659,15 @@
     html += '<div class="macro"><div><strong>' + fmt(g.totale.proteine) + ' g</strong><span>Proteine</span></div>' +
       '<div><strong>' + fmt(g.totale.carboidrati) + ' g</strong><span>Carboidrati</span></div>' +
       '<div><strong>' + fmt(g.totale.grassi) + ' g</strong><span>Grassi</span></div></div>';
-    html += '<div class="scatola">' + g.pasti.map((p, i) =>
-      '<button class="pasto" data-pasto="' + i + '"' + (lettura() ? ' disabled' : '') + '><h2>' + esc(p.nome) + '</h2>' +
-      '<div class="scelti">' + (p.alimenti.length ? p.alimenti.map((a) => '<span class="chip">' + esc(a) + etichettaQta(a, (p.quantita || {})[a], p.nome) + '</span>').join('')
-        : '<span class="vuoto">' + (lettura() ? 'Niente' : 'Tocca per scegliere gli alimenti') + '</span>') + '</div></button>').join('') + '</div>';
+    const iconePasti = ['☕️', '🍎', '🍝', '🍌', '🌙'];
+    html += '<div class="etichetta-sezione">Pasti del giorno</div><div class="pasti">' + g.pasti.map((p, i) =>
+      '<button class="pasto" data-pasto="' + i + '"' + (lettura() ? ' disabled' : '') + '>' +
+      '<span class="icona-pasto c' + (i % 5) + '" aria-hidden="true">' + (iconePasti[i] || '🍽️') + '</span>' +
+      '<span class="testo-pasto"><h2>' + esc(p.nome) + '</h2>' +
+      (p.alimenti.length ? '' : '<span class="vuoto">' + (lettura() ? 'Niente' : 'Tocca per scegliere gli alimenti') + '</span>') + '</span>' +
+      (lettura() ? '<span></span>' : '<span class="piu-pasto" aria-hidden="true">' + ICONE.piu + '</span>') +
+      (p.alimenti.length ? '<div class="scelti">' + p.alimenti.map((a) => '<span class="chip">' + esc(a) + etichettaQta(a, (p.quantita || {})[a], p.nome) + '</span>').join('') + '</div>' : '') +
+      '</button>').join('') + '</div>';
     html += '<div class="etichetta-sezione">Allenamento' + (lettura() ? ' <span class="distintivo">Sola lettura</span>' : '') + '</div><div class="allenamento">' +
       '<button class="interruttore" data-tipo="muscolare" aria-pressed="' + g.allenamento.muscolare + '"' + (lettura() ? ' disabled' : '') + '>Muscolare <span class="levetta"></span></button>' +
       '<button class="interruttore" data-tipo="cardio" aria-pressed="' + g.allenamento.cardio + '"' + (lettura() ? ' disabled' : '') + '>Cardio <span class="levetta"></span></button></div>';

@@ -542,6 +542,9 @@
     const j = await chiedi({ action: 'mese', mese: ym });
     const c = {};
     j.giorni.forEach((g) => { c[g.data] = g; });
+    // Un giorno appena aggiunto che il foglio sta ancora creando resta visibile
+    const nuovo = stato.isoInCreazione;
+    if (nuovo && nuovo.slice(0, 7) === ym && !c[nuovo] && cacheMese(ym)[nuovo]) c[nuovo] = cacheMese(ym)[nuovo];
     stato.cache[ym] = c; stato.caricati[ym] = Date.now();
     scriviLocale('mese_' + ym, c);
     return c;
@@ -566,6 +569,13 @@
       stato.dati = j.dati; stato.giorni = j.giorni; stato.mesi = j.mesi; stato.tokenLettura = j.tokenLettura || '';
       stato.nonLetti = j.nonLetti || []; stato.notifiche = j.notifiche || null; aggiornaContatore();
       scriviLocale('dati', j.dati); scriviLocale('giorni', j.giorni); scriviLocale('mesi', j.mesi);
+      // Lo script aggiornato manda già il mese più recente: niente seconda richiesta
+      if (j.meseCorrente && Array.isArray(j.meseCorrente.giorni)) {
+        const c = {};
+        j.meseCorrente.giorni.forEach((g) => { c[g.data] = g; });
+        stato.cache[j.meseCorrente.mese] = c; stato.caricati[j.meseCorrente.mese] = Date.now();
+        scriviLocale('mese_' + j.meseCorrente.mese, c);
+      }
       if (!stato.corrente || stato.giorni.indexOf(stato.corrente) < 0) stato.corrente = stato.giorni[0] || null;
       if (stato.vista === 'diario') await vaiA(stato.corrente); else disegnaVista();
     } catch (e) {
@@ -811,6 +821,8 @@
 
   // Salvataggi "ottimisti": la schermata si aggiorna subito, il foglio in sottofondo
   async function salvaGiornoRemoto(azione, corpo, prima) {
+    // Se il giorno è appena stato aggiunto, aspetta che il foglio l'abbia creato
+    if (stato.creazione) { try { await stato.creazione; } catch (e) { return; } }
     try {
       const j = await invia(Object.assign({ action: azione, data: prima.data }, corpo));
       salvaGiornoInCache(j.giorno);
@@ -829,7 +841,44 @@
     salvaGiornoRemoto('allenamento', { tipo: b.dataset.tipo, valore: valore }, prima);
   }
 
-  async function nuovoGiorno() {
+  function isoDi(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  // Il giorno nuovo compare subito; il foglio lo crea in sottofondo (i salvataggi aspettano che abbia finito)
+  function nuovoGiorno() {
+    if (stato.creazione) { avviso('Sto ancora creando il giorno precedente…'); return; }
+    if (!stato.giorni.length || !stato.dati) { nuovoGiornoAttesa(); return; }
+    const d = dataDa(stato.giorni[0]); d.setDate(d.getDate() + 1);
+    const iso = isoDi(d);
+    const vuoto = {
+      data: iso, esiste: true,
+      pasti: stato.dati.pasti.map((n) => ({ nome: n, alimenti: [], quantita: {}, kcal: 0, proteine: 0, carboidrati: 0, grassi: 0 })),
+      totale: { kcal: 0, proteine: 0, carboidrati: 0, grassi: 0 },
+      categorie: stato.dati.categorie.map((c) => ({ nome: c, kcal: 0 })),
+      allenamento: { muscolare: false, cardio: false }, commenti: []
+    };
+    const giorniPrima = stato.giorni.slice();
+    stato.giorni = [iso].concat(stato.giorni); scriviLocale('giorni', stato.giorni);
+    salvaGiornoInCache(vuoto);
+    stato.isoInCreazione = iso;
+    stato.vista = 'diario'; stato.corrente = iso;
+    disegnaVista();
+    avviso('Aggiunto ' + etichetta(iso).giorno + '.');
+    stato.creazione = invia({ action: 'nuovoGiorno' }).then((j) => {
+      aggiornaElenchi(j);
+      if (j.data !== iso) {  // il foglio ha creato un altro giorno: segui quello
+        salvaGiornoInCache(j.giorno);
+        if (stato.corrente === iso) { stato.corrente = j.data; if (stato.vista === 'diario') mostraGiornoDaCache(); }
+      }
+      return j;
+    }).catch((e) => {
+      stato.giorni = giorniPrima; scriviLocale('giorni', giorniPrima);
+      const c = cacheMese(iso.slice(0, 7)); delete c[iso]; scriviLocale('mese_' + iso.slice(0, 7), c);
+      if (stato.corrente === iso) { stato.corrente = giorniPrima[0] || null; if (stato.vista === 'diario') mostraGiornoDaCache(); }
+      avviso('Giorno non creato: ' + e.message);
+      throw e;
+    }).finally(() => { stato.creazione = null; stato.isoInCreazione = null; });
+    stato.creazione.catch(() => {});
+  }
+  async function nuovoGiornoAttesa() {
     attesa(true);
     try {
       const j = await invia({ action: 'nuovoGiorno' });

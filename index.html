@@ -352,6 +352,14 @@
 
   .voce-nuova .piu svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 2.6; fill: none; stroke-linecap: round; }
   .nota a { color: var(--viola); font-weight: 600; }
+
+  /* Ricette */
+  .voce-ricetta { gap: 12px; }
+  .icona-ricetta { width: 34px; height: 34px; border-radius: 10px; background: var(--viola-chiaro); display: grid; place-items: center; font-size: 17px; flex: none; }
+  .voce-ricetta .nome small { display: block; font-size: 12px; color: var(--inchiostro-tenue); line-height: 1.35; margin-top: 1px; }
+  .aggiungi-ricetta { font-size: 13px; font-weight: 700; color: var(--viola); white-space: nowrap; }
+  .riga-titoletto { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .riga-titoletto button { flex: none; font-size: 12px; font-weight: 700; color: var(--viola); background: var(--viola-chiaro); border-radius: 999px; padding: 6px 10px; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -416,7 +424,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-04-1';
+  const VERSIONE = '2026-11-04-2';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -446,7 +454,7 @@
     token: daLink ? hash.get('l') : (localStorage.getItem('pa_token') || ''),
     ruolo: daLink ? 'lettura' : (localStorage.getItem('pa_ruolo') || 'scrittura'),
     dati: null, giorni: [], mesi: [], tokenLettura: '', nonLetti: [], notifiche: null,
-    cache: {}, caricati: {},
+    cache: {}, caricati: {}, ricette: [], ricetteSulFoglio: false,
     vista: 'diario', corrente: null, giorno: null,
     pasto: null, scelta: [], filtro: null,
     aperti: {}, filtroIng: null, cercaIng: ''
@@ -561,6 +569,7 @@
     stato.dati = leggiLocale('dati');
     stato.giorni = leggiLocale('giorni') || [];
     stato.mesi = leggiLocale('mesi') || [];
+    stato.ricette = (stato.dati && Array.isArray(stato.dati.ricette)) ? stato.dati.ricette : (leggiLocale('ricette') || []);
     if (stato.dati && stato.giorni.length) { stato.corrente = stato.giorni[0]; mostraGiornoDaCache(); }
     else { $('testata').className = 'testata semplice'; $('testata').innerHTML = '<span></span><h1>Piano alimentare</h1><span></span>'; $('contenuto').innerHTML = '<div class="messaggio"><p>Caricamento dal foglio…</p></div>'; }
     // Con i dati già sul telefono l'aggiornamento dal foglio avviene in silenzio, senza la scritta in alto
@@ -571,6 +580,10 @@
       stato.ruolo = daLink ? 'lettura' : j.ruolo;
       if (!daLink) localStorage.setItem('pa_ruolo', j.ruolo);
       stato.dati = j.dati; stato.giorni = j.giorni; stato.mesi = j.mesi; stato.tokenLettura = j.tokenLettura || '';
+      // Con lo script aggiornato le ricette stanno nel foglio; altrimenti restano su questo telefono
+      stato.ricetteSulFoglio = Array.isArray(j.dati.ricette);
+      stato.ricette = stato.ricetteSulFoglio ? j.dati.ricette : (leggiLocale('ricette') || []);
+      if (stato.ricetteSulFoglio && !daLink) migraRicetteLocali();
       stato.nonLetti = j.nonLetti || []; stato.notifiche = j.notifiche || null; aggiornaContatore();
       scriviLocale('dati', j.dati); scriviLocale('giorni', j.giorni); scriviLocale('mesi', j.mesi);
       // Lo script aggiornato manda già il mese più recente: niente seconda richiesta
@@ -908,6 +921,90 @@
   }
   function apriVelo() { $('velo').classList.remove('nascosto'); requestAnimationFrame(() => $('velo').classList.add('aperto')); }
   function chiudiVelo() { $('velo').classList.remove('aperto'); setTimeout(() => $('velo').classList.add('nascosto'), 250); }
+  /* ---------- Ricette: alimenti con le quantità, da aggiungere a un pasto con un tocco ---------- */
+  function impostaRicette(lista) {
+    stato.ricette = lista;
+    if (stato.ricetteSulFoglio) { stato.dati.ricette = lista; scriviLocale('dati', stato.dati); } else scriviLocale('ricette', lista);
+  }
+  async function scriviRicetta(r) {
+    if (stato.ricetteSulFoglio) { const j = await invia({ action: 'salvaRicetta', ricetta: r }); impostaRicette(j.ricette); }
+    else impostaRicette(stato.ricette.filter((x) => x.n !== r.n).concat([r]));
+  }
+  async function cancellaRicetta(nome) {
+    if (stato.ricetteSulFoglio) { const j = await invia({ action: 'eliminaRicetta', nome: nome }); impostaRicette(j.ricette); }
+    else impostaRicette(stato.ricette.filter((x) => x.n !== nome));
+  }
+  // Ricette salvate sul telefono prima dell'aggiornamento dello script: le porta nel foglio
+  async function migraRicetteLocali() {
+    const locali = leggiLocale('ricette') || [];
+    if (!locali.length) return;
+    try {
+      for (const r of locali) {
+        if (!stato.ricette.some((x) => x.n === r.n)) { const j = await invia({ action: 'salvaRicetta', ricetta: r }); stato.ricette = j.ricette; }
+      }
+      impostaRicette(stato.ricette);
+      localStorage.removeItem(prefisso + 'ricette');
+    } catch (e) { /* riprova al prossimo avvio */ }
+  }
+  function riassuntoRicetta(r, pasto) {
+    return Object.keys(r.voci).map((n) => {
+      const a = ingrediente(n);
+      return n + ' ' + fmt(r.voci[n], 1) + (a ? ' ' + a.u : '');
+    }).join(' · ');
+  }
+  function applicaRicetta(r) {
+    const mancanti = [];
+    Object.keys(r.voci).forEach((n) => {
+      if (!ingrediente(n)) { mancanti.push(n); return; }
+      if (!stato.scelta.includes(n)) stato.scelta.push(n);
+      stato.qta[n] = r.voci[n];
+    });
+    disegnaListaAlimenti();
+    avviso(mancanti.length ? 'Aggiunta. Non trovati tra gli ingredienti: ' + mancanti.join(', ') + '.' : '«' + r.n + '» aggiunta. Puoi cambiare le quantità qui sotto.');
+  }
+  function nuovaRicetta() {
+    const pasto = stato.giorno.pasti[stato.pasto].nome;
+    const voci = {};
+    stato.scelta.forEach((n) => {
+      const a = ingrediente(n);
+      if (a) voci[n] = Math.round(quantita(a, pasto, stato.qta[n]) * 10) / 10;
+    });
+    const r0 = { n: '', voci: voci };
+    apriFoglio('Nuova ricetta',
+      '<label class="campo"><span>Nome della ricetta</span><input id="r-n" placeholder="es. Pasta col tonno" autocomplete="off"></label>' +
+      '<p class="nota">Contiene, con le quantità di adesso:</p><p style="margin:0 0 6px">' + esc(riassuntoRicetta(r0)) + '</p>' +
+      '<p class="nota" style="margin-top:12px">La trovi in cima alla lista quando scegli un pasto: un tocco e aggiunge tutto.</p>',
+      '<button class="bottone largo" id="r-salva">Salva ricetta</button>');
+    setTimeout(() => $('r-n').focus(), 300);
+    $('r-salva').onclick = async () => {
+      const nome = $('r-n').value.trim();
+      if (!nome) { avviso('Scrivi un nome.'); return; }
+      if (stato.ricette.some((x) => x.n === nome) && !confirm('Esiste già «' + nome + '». Vuoi sostituirla?')) return;
+      $('r-salva').disabled = true; attesa(true);
+      try {
+        await scriviRicetta({ n: nome, voci: voci });
+        chiudiFoglio(true); disegnaListaAlimenti(); avviso('Ricetta «' + nome + '» salvata.');
+      } catch (e) { avviso(e.message); $('r-salva').disabled = false; }
+      finally { attesa(false); }
+    };
+  }
+  function mostraRicetta(r) {
+    apriFoglio(r.n,
+      '<p class="nota">Alimenti e quantità</p><div class="scatola" style="margin:0">' + Object.keys(r.voci).map((n) => {
+        const a = ingrediente(n);
+        return '<div class="riga"><span class="principale"><b>' + esc(n) + '</b>' + (a ? '' : '<small>non più tra gli ingredienti</small>') + '</span><span class="valore">' + fmt(r.voci[n], 1) + ' <small>' + esc(a ? a.u : '') + '</small></span></div>';
+      }).join('') + '</div>' +
+      '<p class="nota" style="margin-top:14px">Per cambiarla: apri un pasto, aggiungi la ricetta, modifica gli alimenti o le quantità e salvala di nuovo con lo stesso nome.</p>',
+      lettura() ? '' : '<button class="bottone pericolo largo" id="r-elimina">Elimina ricetta</button>');
+    if ($('r-elimina')) $('r-elimina').onclick = async () => {
+      if (!confirm('Eliminare la ricetta «' + r.n + '»? I pasti già segnati non cambiano.')) return;
+      attesa(true);
+      try { await cancellaRicetta(r.n); chiudiFoglio(); disegnaIngredienti(); avviso('Ricetta eliminata.'); }
+      catch (e) { avviso(e.message); }
+      finally { attesa(false); }
+    };
+  }
+
   function apriPannello(i) {
     stato.pasto = i; stato.scelta = stato.giorno.pasti[i].alimenti.slice(); stato.filtro = null;
     stato.qta = Object.assign({}, stato.giorno.pasti[i].quantita || {});
@@ -933,13 +1030,20 @@
         gruppo.map((a) => '<button class="voce" role="checkbox" aria-checked="' + stato.scelta.includes(a.n) + '" data-nome="' + esc(a.n) + '">' +
           '<span class="spunta"></span><span class="nome">' + esc(a.n) + '</span><span class="porzione">' + esc(porzione(a)) + '</span></button>').join('');
     });
+    const ric = stato.filtro ? [] : stato.ricette.filter((r) => !q || r.n.toLowerCase().includes(q));
+    if (ric.length) {
+      html = '<div class="gruppo"><i style="background:var(--viola)"></i>Ricette</div>' + ric.map((r) =>
+        '<button class="voce voce-ricetta" data-ricetta="' + esc(r.n) + '"><span class="icona-ricetta" aria-hidden="true">📖</span>' +
+        '<span class="nome">' + esc(r.n) + '<small>' + esc(riassuntoRicetta(r)) + '</small></span><span class="aggiungi-ricetta">Aggiungi</span></button>').join('') + html;
+    }
     const testoCerca = $('cerca').value.trim();
     const nuova = '<button class="voce-nuova" id="voce-nuova"><span class="piu">+</span><span>' +
       (testoCerca && !html ? 'Aggiungi «' + esc(testoCerca) + '» a mano' : 'Alimento o pasto personalizzato') +
       '<small>Scrivi tu quantità e grammi, lo ritrovi poi tra gli ingredienti</small></span></button>';
     $('lista-alimenti').innerHTML = (html ? '' : '<p class="vuoto">Nessun alimento trovato.</p>') + nuova + html;
     $('voce-nuova').onclick = () => nuovoPersonalizzato(testoCerca);
-    $('lista-alimenti').querySelectorAll('.voce').forEach((b) => b.onclick = () => alterna(b.dataset.nome, b));
+    $('lista-alimenti').querySelectorAll('.voce[data-nome]').forEach((b) => b.onclick = () => alterna(b.dataset.nome, b));
+    $('lista-alimenti').querySelectorAll('.voce-ricetta').forEach((b) => b.onclick = () => applicaRicetta(stato.ricette.find((r) => r.n === b.dataset.ricetta)));
     disegnaSelezionati();
   }
   function nuovoPersonalizzato(nomeIniziale) {
@@ -1004,8 +1108,9 @@
         '<button aria-label="Togli ' + esc(n) + '">×</button></div>';
     }).join('');
     $('selezionati').innerHTML = stato.scelta.length
-      ? '<div class="titoletto">Quantità: lascia vuoto per la porzione consigliata</div>' + righe
+      ? '<div class="titoletto riga-titoletto"><span>Quantità: lascia vuoto per la porzione consigliata</span><button id="salva-ricetta">Salva come ricetta</button></div>' + righe
       : '';
+    if ($('salva-ricetta')) $('salva-ricetta').onclick = nuovaRicetta;
     $('selezionati').querySelectorAll('.sel-riga').forEach((r) => {
       const nome = r.dataset.nome, input = r.querySelector('input');
       input.oninput = () => {
@@ -1197,13 +1302,23 @@
     let html = '<div style="padding:14px 16px 0"><input class="cerca" id="cerca-ing" type="search" placeholder="Cerca un ingrediente" value="' + esc(stato.cercaIng) + '"></div>' +
       '<div class="filtri" id="filtri-ing">' + '<button class="filtro" aria-pressed="' + (stato.filtroIng === null) + '" data-cat="">Tutti</button>' +
       stato.dati.categorie.map((c) => '<button class="filtro" aria-pressed="' + (stato.filtroIng === c) + '" data-cat="' + esc(c) + '"><i style="background:' + (COLORI[c] || '#ccc') + '"></i>' + esc(c) + '</button>').join('') + '</div>' +
-      '<div id="elenco-ing"></div>';
+      '<div id="elenco-ric"></div><div id="elenco-ing"></div>';
     $('contenuto').innerHTML = html;
     $('cerca-ing').oninput = (e) => { stato.cercaIng = e.target.value; elencoIngredienti(); };
     $('filtri-ing').querySelectorAll('.filtro').forEach((b) => b.onclick = () => { stato.filtroIng = b.dataset.cat || null; disegnaIngredienti(); });
     elencoIngredienti();
   }
+  function elencoRicette() {
+    const q = stato.cercaIng.trim().toLowerCase();
+    const ric = stato.filtroIng ? [] : stato.ricette.filter((r) => !q || r.n.toLowerCase().includes(q));
+    $('elenco-ric').innerHTML = !ric.length ? (q || stato.filtroIng || lettura() ? '' :
+      '<p class="nota" style="margin:14px 20px 0">Ricette: nel pannello di un pasto scegli gli alimenti e tocca «Salva come ricetta».</p>') :
+      '<div class="gruppo"><i style="background:var(--viola)"></i>Ricette</div><div class="scatola" style="margin-top:4px">' + ric.map((r) =>
+        '<button class="riga" data-ricetta="' + esc(r.n) + '"><span class="principale"><b>' + esc(r.n) + '</b><small>' + esc(riassuntoRicetta(r)) + '</small></span></button>').join('') + '</div>';
+    $('elenco-ric').querySelectorAll('[data-ricetta]').forEach((b) => b.onclick = () => mostraRicetta(stato.ricette.find((r) => r.n === b.dataset.ricetta)));
+  }
   function elencoIngredienti() {
+    elencoRicette();
     const q = stato.cercaIng.trim().toLowerCase();
     const ing = stato.dati.ingredienti.filter((a) => (!stato.filtroIng || a.c === stato.filtroIng) && (!q || a.n.toLowerCase().includes(q)));
     let html = '';

@@ -381,6 +381,17 @@
   .voce-olio .nome small { display: block; font-size: 12px; font-weight: 400; color: var(--inchiostro-tenue); }
   .voce-olio[aria-pressed="true"] { background: #F1FBF3; box-shadow: inset 0 0 0 1.5px #9EDDAE; }
   .voce-olio[aria-pressed="true"] .aggiungi-ricetta { color: var(--verde); }
+
+  /* Carosello: calorie, poi macronutrienti */
+  .carosello { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .carosello::-webkit-scrollbar { display: none; }
+  .carosello .slide { flex: 0 0 100%; min-width: 0; scroll-snap-align: center; display: flex; }
+  .carosello .scheda-calorie, .carosello .grafico-giorno { flex: 1; min-width: 0; }
+  .puntini { display: flex; justify-content: center; gap: 7px; padding: 12px 0 0; }
+  .puntini button { width: 8px; height: 8px; border-radius: 50%; background: #D6D6E0; padding: 0; transition: width .2s; }
+  .puntini button[aria-current="true"] { background: var(--inchiostro); width: 20px; border-radius: 4px; }
+  .icona-olio { background: #FFF4D6; }
+  .icona-olio svg { width: 24px; height: 24px; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -448,7 +459,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-05-4';
+  const VERSIONE = '2026-11-05-5';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -1052,8 +1063,9 @@
 
   function disegnaGiorno() {
     const g = stato.giorno;
-    let html = schedaCalorie(g.totale.kcal, stato.dati.obiettivi.kcal) + '<div class="grafico-giorno">' +
-      '<h3 class="titolo-grafico">Macronutrienti (g)</h3><div class="area-grafico">' + graficoGrammi(g.totale) + '</div></div>';
+    let html = '<div class="carosello" id="carosello"><div class="slide">' + schedaCalorie(g.totale.kcal, stato.dati.obiettivi.kcal) + '</div>' +
+      '<div class="slide"><div class="grafico-giorno"><h3 class="titolo-grafico">Macronutrienti (g)</h3><div class="area-grafico">' + graficoGrammi(g.totale) + '</div></div></div></div>' +
+      '<div class="puntini" id="puntini"><button aria-label="Calorie" data-slide="0"></button><button aria-label="Macronutrienti" data-slide="1"></button></div>';
     html += '<div class="macro"><div><strong>' + fmt(g.totale.proteine) + ' g</strong><span>Proteine</span></div>' +
       '<div><strong>' + fmt(g.totale.carboidrati) + ' g</strong><span>Carboidrati</span></div>' +
       '<div><strong>' + fmt(g.totale.grassi) + ' g</strong><span>Grassi</span></div></div>';
@@ -1077,6 +1089,7 @@
         (stato.nonLetti.some((c) => c.data === g.data) ? '<button id="vai-commenti">Leggi</button>' : '<button id="vai-commenti">Vedi</button>') + '</div>' + html;
     }
     $('contenuto').innerHTML = html;
+    impostaCarosello();
     impostaCommenti(g);
     if (!lettura()) {
       document.querySelectorAll('.pasto').forEach((b) => b.onclick = () => apriPannello(Number(b.dataset.pasto)));
@@ -1167,6 +1180,22 @@
     try { if (n && navigator.setAppBadge) navigator.setAppBadge(n); else if (navigator.clearAppBadge) navigator.clearAppBadge(); } catch (e) { /* non supportato */ }
   }
 
+  // Cucchiaio con l'olio (disegno vettoriale)
+  const ICONA_OLIO = '<svg viewBox="0 0 32 32"><g transform="rotate(-38 15 18)">' +
+    '<rect x="19" y="16.3" width="12" height="3.4" rx="1.7" fill="#A3A3B8"/>' +
+    '<ellipse cx="12" cy="18" rx="8.2" ry="5.6" fill="#BFBFD0"/>' +
+    '<ellipse cx="12" cy="18" rx="6.4" ry="4" fill="#E9B23F"/>' +
+    '<ellipse cx="10" cy="16.7" rx="2.3" ry="1.1" fill="#FFE29A"/></g>' +
+    '<path d="M8.5 2.5c1.9 2.5 2.9 4.1 2.9 5.3a2.9 2.9 0 0 1-5.8 0c0-1.2 1-2.8 2.9-5.3z" fill="#E9B23F"/></svg>';
+  function impostaCarosello() {
+    const c = $('carosello'); if (!c) return;
+    const puntini = () => document.querySelectorAll('#puntini button').forEach((b, i) => b.setAttribute('aria-current', String(i === (stato.slide || 0))));
+    c.scrollLeft = (stato.slide || 0) * c.clientWidth;
+    puntini();
+    let t;
+    c.addEventListener('scroll', () => { clearTimeout(t); t = setTimeout(() => { stato.slide = Math.round(c.scrollLeft / c.clientWidth); puntini(); }, 60); }, { passive: true });
+    document.querySelectorAll('#puntini button').forEach((b) => b.onclick = () => { c.scrollTo({ left: Number(b.dataset.slide) * c.clientWidth, behavior: 'smooth' }); });
+  }
   // Anello delle calorie: si riempie verso l'obiettivo del Piano
   function schedaCalorie(kcal, obiettivo) {
     const r = 78, c = 2 * Math.PI * r, frazione = obiettivo > 0 ? Math.min(kcal / obiettivo, 1) : 0;
@@ -1410,7 +1439,7 @@
     let olio = '';
     if (/^(pranzo|cena)$/i.test(nomePasto) && ingrediente('Olio EVO') && !stato.filtro && (!q || 'olio evo'.includes(q))) {
       const preso = stato.scelta.includes('Olio EVO');
-      olio = '<button class="voce-olio" id="voce-olio" aria-pressed="' + preso + '"><span class="icona-ricetta" aria-hidden="true">🫒</span>' +
+      olio = '<button class="voce-olio" id="voce-olio" aria-pressed="' + preso + '"><span class="icona-ricetta icona-olio" aria-hidden="true">' + ICONA_OLIO + '</span>' +
         '<span class="nome">Olio EVO<small>' + (preso ? 'Aggiunto: ' + fmt(stato.qta['Olio EVO'] !== undefined ? stato.qta['Olio EVO'] : 3, 1) + ' cucchiai. Tocca per toglierlo' : '3 cucchiai, tocca per aggiungerlo') + '</small></span>' +
         '<span class="aggiungi-ricetta">' + (preso ? '✓' : '+ 3') + '</span></button>';
     }

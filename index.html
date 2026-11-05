@@ -11,10 +11,13 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.json">
 <title>Piano alimentare</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
+  /* Font Plus Jakarta Sans ospitato nel repository (licenza SIL OFL 1.1, vedi fonts/OFL.txt): nessuna richiesta a Google */
+  @font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/plus-jakarta-sans-latin-400-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/plus-jakarta-sans-latin-500-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/plus-jakarta-sans-latin-600-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/plus-jakarta-sans-latin-700-normal.woff2") format("woff2"); }
+  @font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 800; font-display: swap; src: url("fonts/plus-jakarta-sans-latin-800-normal.woff2") format("woff2"); }
   :root {
     --crema: #F3F4F8; --carta: #FFFFFF; --salmone: #DCD0FC; --salmone-chiaro: #EFEAFE;
     --burro: #FFD99A; --burro-chiaro: #FFF4E0; --salvia: #CDEFD5;
@@ -424,7 +427,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-04-2';
+  const VERSIONE = '2026-11-05-1';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });

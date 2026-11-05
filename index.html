@@ -374,6 +374,13 @@
   .centro-anello strong { font-size: clamp(30px, 9vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
   .resto-calorie { margin: 10px 0 0; font-size: 14px; font-weight: 700; color: var(--viola); }
   .resto-calorie.oltre { color: var(--rosso); }
+
+  /* Olio pronto a pranzo e cena */
+  .voce-olio { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin: 8px 0 2px; border-radius: 16px; background: var(--carta); box-shadow: 0 1px 3px rgba(20,20,40,.06); text-align: left; font-weight: 600; }
+  .voce-olio .nome { flex: 1; }
+  .voce-olio .nome small { display: block; font-size: 12px; font-weight: 400; color: var(--inchiostro-tenue); }
+  .voce-olio[aria-pressed="true"] { background: #F1FBF3; box-shadow: inset 0 0 0 1.5px #9EDDAE; }
+  .voce-olio[aria-pressed="true"] .aggiungi-ricetta { color: var(--verde); }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -441,7 +448,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-05-3';
+  const VERSIONE = '2026-11-05-4';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -1398,12 +1405,27 @@
         '<button class="voce voce-ricetta" data-ricetta="' + esc(r.n) + '"><span class="icona-ricetta" aria-hidden="true">📖</span>' +
         '<span class="nome">' + esc(r.n) + '<small>' + esc(riassuntoRicetta(r)) + '</small></span><span class="aggiungi-ricetta">Aggiungi</span></button>').join('') + html;
     }
+    // Pranzo e cena: olio pronto da toccare (3 cucchiai), non già messo
+    const nomePasto = stato.giorno.pasti[stato.pasto].nome;
+    let olio = '';
+    if (/^(pranzo|cena)$/i.test(nomePasto) && ingrediente('Olio EVO') && !stato.filtro && (!q || 'olio evo'.includes(q))) {
+      const preso = stato.scelta.includes('Olio EVO');
+      olio = '<button class="voce-olio" id="voce-olio" aria-pressed="' + preso + '"><span class="icona-ricetta" aria-hidden="true">🫒</span>' +
+        '<span class="nome">Olio EVO<small>' + (preso ? 'Aggiunto: ' + fmt(stato.qta['Olio EVO'] !== undefined ? stato.qta['Olio EVO'] : 3, 1) + ' cucchiai. Tocca per toglierlo' : '3 cucchiai, tocca per aggiungerlo') + '</small></span>' +
+        '<span class="aggiungi-ricetta">' + (preso ? '✓' : '+ 3') + '</span></button>';
+    }
     const testoCerca = $('cerca').value.trim();
     const nuova = '<button class="voce-nuova" id="voce-nuova"><span class="piu">+</span><span>' +
       (testoCerca && !html ? 'Aggiungi «' + esc(testoCerca) + '» a mano' : 'Alimento o pasto personalizzato') +
       '<small>Scrivi tu quantità e grammi, lo ritrovi poi tra gli ingredienti</small></span></button>';
-    $('lista-alimenti').innerHTML = (html ? '' : '<p class="vuoto">Nessun alimento trovato.</p>') + nuova + html;
+    $('lista-alimenti').innerHTML = olio + (html ? '' : '<p class="vuoto">Nessun alimento trovato.</p>') + nuova + html;
     $('voce-nuova').onclick = () => nuovoPersonalizzato(testoCerca);
+    if ($('voce-olio')) $('voce-olio').onclick = () => {
+      const i = stato.scelta.indexOf('Olio EVO');
+      if (i >= 0) { stato.scelta.splice(i, 1); delete stato.qta['Olio EVO']; }
+      else { stato.scelta.push('Olio EVO'); stato.qta['Olio EVO'] = 3; }
+      disegnaListaAlimenti();
+    };
     $('lista-alimenti').querySelectorAll('.voce[data-nome]').forEach((b) => b.onclick = () => alterna(b.dataset.nome, b));
     $('lista-alimenti').querySelectorAll('.voce-ricetta').forEach((b) => b.onclick = () => applicaRicetta(stato.ricette.find((r) => r.n === b.dataset.ricetta)));
     disegnaSelezionati();

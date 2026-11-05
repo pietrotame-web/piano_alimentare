@@ -1,0 +1,5 @@
+Firebase JavaScript SDK 13.2.0 (build "compat": app, auth, firestore)
+Copiato dal pacchetto npm "firebase" (https://www.npmjs.com/package/firebase),
+Copyright Google LLC, distribuito con licenza Apache License 2.0:
+https://www.apache.org/licenses/LICENSE-2.0
+Ospitato qui perché l'app non carichi script da server esterni.

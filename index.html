@@ -370,12 +370,12 @@
 
 <section id="impostazioni" class="impostazioni nascosto">
   <h1>Piano alimentare</h1>
-  <p>Collega l'app al tuo foglio Google. Lo fai una volta sola su questo telefono.</p>
-  <label for="url">Indirizzo dell'app web dello script</label>
-  <input id="url" type="url" inputmode="url" autocomplete="off" autocapitalize="off" placeholder="https://script.google.com/macros/s/…/exec">
-  <label for="token">Parola segreta</label>
-  <input id="token" type="password" autocomplete="off" autocapitalize="off" placeholder="La stessa scritta nello script">
-  <button class="bottone" id="collega">Collega il foglio</button>
+  <p>Accedi con l'account creato in Firebase. Lo fai una volta sola su questo telefono.</p>
+  <label for="email">Email</label>
+  <input id="email" type="email" inputmode="email" autocomplete="username" autocapitalize="off">
+  <label for="password">Password</label>
+  <input id="password" type="password" autocomplete="current-password" autocapitalize="off">
+  <button class="bottone" id="accedi">Accedi</button>
 </section>
 
 <div id="app" class="nascosto">
@@ -424,10 +424,13 @@
 <div class="attesa nascosto" id="attesa">Aggiornamento…</div>
 <div class="avviso" id="avviso" role="status"></div>
 
+<script src="vendor/firebase/firebase-app-compat.js"></script>
+<script src="vendor/firebase/firebase-auth-compat.js"></script>
+<script src="vendor/firebase/firebase-firestore-compat.js"></script>
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-05-1';
+  const VERSIONE = '2026-11-05-2';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -451,10 +454,9 @@
 
   /* ---------- Collegamento: link della nutrizionista (#u=…&l=…) oppure configurazione salvata ---------- */
   const hash = new URLSearchParams(location.hash.slice(1));
-  const daLink = hash.get('u') && hash.get('l');
+  // Il link della nutrizionista contiene la sua password: #l=… (i link vecchi #u=…&l=… funzionano ancora)
+  const daLink = !!hash.get('l');
   const stato = {
-    url: daLink ? hash.get('u') : (localStorage.getItem('pa_url') || ''),
-    token: daLink ? hash.get('l') : (localStorage.getItem('pa_token') || ''),
     ruolo: daLink ? 'lettura' : (localStorage.getItem('pa_ruolo') || 'scrittura'),
     dati: null, giorni: [], mesi: [], tokenLettura: '', nonLetti: [], notifiche: null,
     cache: {}, caricati: {}, ricette: [], ricetteSulFoglio: false,
@@ -472,17 +474,327 @@
   const leggiLocale = (k) => { try { return JSON.parse(localStorage.getItem(prefisso + k)); } catch (e) { return null; } };
   const scriviLocale = (k, v) => { try { localStorage.setItem(prefisso + k, JSON.stringify(v)); } catch (e) { /* spazio pieno */ } };
 
-  /* ---------- Comunicazione con il foglio ---------- */
-  async function chiedi(parametri) {
-    const q = new URLSearchParams(Object.assign({ token: stato.token }, parametri));
-    const r = await fetch(stato.url + '?' + q.toString());
-    return controlla(await r.json());
+  /* ---------- Database: Firebase (Firestore + accesso con email e password) ----------
+     Le funzioni chiedi/invia rispondono come faceva lo script di Google Sheets, così il resto dell'app non cambia. */
+  const FIREBASE = {
+    apiKey: 'AIzaSyD1B8PLri-B5eI-xKK7mkqvdmhO1lJAqPM',
+    authDomain: 'piano-alimentare-ce3d5.firebaseapp.com',
+    projectId: 'piano-alimentare-ce3d5',
+    storageBucket: 'piano-alimentare-ce3d5.firebasestorage.app',
+    messagingSenderId: '472026248780',
+    appId: '1:472026248780:web:345d9e838d82c107f4e6e9'
+  };
+  const UID_PROPRIETARIO = 'jNWaRRy96PcQC34yf5npa6oD4kF2';
+  const UID_NUTRIZIONISTA = 'qpNSEGbV9fYUoFQEjRrLoVLXDP92';
+  const EMAIL_NUTRIZIONISTA = 'nutrizionista@piano.app';
+  const NOMI_MESI = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+  firebase.initializeApp(FIREBASE);
+  const auth = firebase.auth(), db = firebase.firestore();
+  const primoUtente = new Promise((ok) => { const stop = auth.onAuthStateChanged((u) => { stop(); ok(u); }); });
+  const cfg = (id) => db.collection('config').doc(id);
+  const docGiorno = (iso) => db.collection('giorni').doc(iso);
+  let elencoIso = null;   // tutti i giorni, dal più recente
+
+  function erroreDb(e) {
+    const c = String((e && e.code) || '');
+    if (c.includes('permission-denied')) return new Error('Non hai i permessi per questa operazione.');
+    if (c.includes('not-found')) return new Error('Questo giorno non esiste più.');
+    if (c.includes('unavailable') || c.includes('network')) return new Error('Connessione assente: riprova tra poco.');
+    return new Error((e && e.message) || 'Errore del database.');
   }
-  async function invia(corpo) {
-    const r = await fetch(stato.url, { method: 'POST', body: JSON.stringify(Object.assign({ token: stato.token }, corpo)) });
-    return controlla(await r.json());
+  const meseNome = (ym) => NOMI_MESI[Number(ym.slice(5, 7)) - 1] + ' ' + ym.slice(0, 4);
+  function elencoMesi() {
+    return [...new Set(elencoIso.map((d) => d.slice(0, 7)))].sort().reverse().map((m) => ({ mese: m, nome: meseNome(m) }));
   }
-  function controlla(j) { if (!j.ok) throw new Error(j.errore || 'Il foglio non ha risposto correttamente.'); return j; }
+  function pulisciQuantita(q) {
+    const o = {};
+    Object.keys(q || {}).forEach((k) => { const n = Number(q[k]); if (k && isFinite(n) && n > 0) o[k] = n; });
+    return o;
+  }
+  function oraAdesso() {
+    const d = new Date(), z = (n) => ('0' + n).slice(-2);
+    return isoDi(d) + 'T' + z(d.getHours()) + ':' + z(d.getMinutes());
+  }
+  function giornoDaDoc(iso, d, commenti) {
+    const pasti = stato.dati.pasti.map((nome, i) => {
+      const p = (d && d.pasti && d.pasti[i]) || {};
+      return { nome: nome, alimenti: (p.alimenti || []).slice(), quantita: Object.assign({}, p.quantita || {}) };
+    });
+    const al = (d && d.allenamento) || {};
+    return ricalcola({
+      data: iso, esiste: !!d, pasti: pasti, allenamento: { muscolare: !!al.muscolare, cardio: !!al.cardio },
+      commenti: (commenti || []).filter((c) => c.data === iso).sort((a, b) => (a.quando < b.quando ? -1 : 1))
+    });
+  }
+  const conId = (x) => Object.assign({ id: x.id }, x.data());
+  async function leggiCommenti() { return (await db.collection('commenti').get()).docs.map(conId); }
+  async function leggiGiornoDb(iso) {
+    const [d, c] = await Promise.all([docGiorno(iso).get(), db.collection('commenti').where('data', '==', iso).get()]);
+    return giornoDaDoc(iso, d.exists ? d.data() : null, c.docs.map(conId));
+  }
+  async function commentiNonLetti() {
+    return (await db.collection('commenti').where('letto', '==', false).get()).docs.map((x) => ({ id: x.id, data: x.data().data }));
+  }
+  async function leggiConfig() {
+    const [p, i, r, c] = await Promise.all(['piano', 'ingredienti', 'ricette', 'condivisione'].map((id) => cfg(id).get()));
+    if (!p.exists) { const e = new Error('Il database è vuoto.'); e.vuoto = true; throw e; }
+    const piano = p.data();
+    return {
+      dati: { ingredienti: (i.exists && i.data().lista) || [], ricette: (r.exists && r.data().lista) || [],
+              pasti: piano.pasti, categorie: piano.categorie, schema: piano.schema, obiettivi: piano.obiettivi },
+      tokenLettura: c.exists ? (c.data().tokenLettura || '') : ''
+    };
+  }
+  async function assicuraElenco() {
+    if (!elencoIso) { elencoIso = (await db.collection('giorni').get()).docs.map((x) => x.id); elencoIso.sort().reverse(); }
+  }
+  async function creaGiorno(iso) {
+    const pasti = {};
+    stato.dati.pasti.forEach((n, i) => { pasti[i] = { alimenti: [], quantita: {} }; });
+    await docGiorno(iso).set({ data: iso, pasti: pasti, allenamento: { muscolare: false, cardio: false } });
+    if (elencoIso.indexOf(iso) < 0) { elencoIso.push(iso); elencoIso.sort().reverse(); }
+  }
+  // Scrive tante operazioni a blocchi (Firestore ne accetta al massimo 500 per volta)
+  async function aBlocchi(operazioni) {
+    for (let i = 0; i < operazioni.length; i += 400) {
+      const b = db.batch();
+      operazioni.slice(i, i + 400).forEach((op) => op(b));
+      await b.commit();
+    }
+  }
+  async function eliminaGiorniDb(lista) {
+    const commenti = (await leggiCommenti()).filter((c) => lista.indexOf(c.data) >= 0);
+    await aBlocchi(lista.map((iso) => (b) => b.delete(docGiorno(iso))).concat(commenti.map((c) => (b) => b.delete(db.collection('commenti').doc(c.id)))));
+    elencoIso = elencoIso.filter((d) => lista.indexOf(d) < 0);
+  }
+  async function listaIngredienti() { const d = await cfg('ingredienti').get(); return (d.exists && d.data().lista) || []; }
+  async function salvaIngredienteDb(originale, d) {
+    const nome = String(d.n || '').trim();
+    if (!nome) throw new Error('Scrivi il nome dell\'ingrediente.');
+    if (/[,;=|]/.test(nome)) throw new Error('Il nome non può contenere virgole, punti e virgola, = o |.');
+    const lista = await listaIngredienti();
+    if (lista.some((a) => a.n === nome && a.n !== originale)) throw new Error('Esiste già un ingrediente con questo nome.');
+    const num = (x) => (x === '' || x === null || x === undefined ? '' : Number(x));
+    const nuovo = { c: String(d.c || ''), n: nome, u: ['g', 'ml', 'pz'].indexOf(d.u) >= 0 ? d.u : 'g', p: num(d.p),
+                    k: Number(d.k) || 0, pr: Number(d.pr) || 0, ca: Number(d.ca) || 0, gr: Number(d.gr) || 0, f: String(d.f || '') };
+    if ([nuovo.k, nuovo.pr, nuovo.ca, nuovo.gr].some((x) => x < 0) || (nuovo.p !== '' && !(nuovo.p >= 0))) throw new Error('Controlla i numeri: devono essere positivi.');
+    const i = originale ? lista.findIndex((a) => a.n === originale) : -1;
+    if (i >= 0) lista[i] = Object.assign({}, lista[i], nuovo); else lista.push(nuovo);
+    await cfg('ingredienti').set({ lista: lista });
+    if (originale && originale !== nome) await rinominaOvunque(originale, nome);
+    return lista;
+  }
+  // Se un ingrediente cambia nome, si aggiorna anche nei giorni già segnati e nelle ricette
+  async function rinominaOvunque(vecchio, nuovo) {
+    const ops = [];
+    (await db.collection('giorni').get()).docs.forEach((x) => {
+      const pasti = x.data().pasti || {}; let cambiato = false;
+      Object.keys(pasti).forEach((k) => {
+        const p = pasti[k];
+        if ((p.alimenti || []).indexOf(vecchio) < 0) return;
+        cambiato = true;
+        p.alimenti = p.alimenti.map((a) => (a === vecchio ? nuovo : a));
+        if (p.quantita && p.quantita[vecchio] !== undefined) { p.quantita[nuovo] = p.quantita[vecchio]; delete p.quantita[vecchio]; }
+      });
+      if (cambiato) ops.push((b) => b.update(x.ref, { pasti: pasti }));
+    });
+    await aBlocchi(ops);
+    const r = await cfg('ricette').get();
+    if (r.exists) {
+      const lista = (r.data().lista || []).map((ric) => {
+        if (ric.voci[vecchio] === undefined) return ric;
+        const voci = {}; Object.keys(ric.voci).forEach((k) => { voci[k === vecchio ? nuovo : k] = ric.voci[k]; });
+        return { n: ric.n, voci: voci };
+      });
+      await cfg('ricette').set({ lista: lista });
+    }
+  }
+  async function salvaRicetteDb(modifica) {
+    const d = await cfg('ricette').get();
+    const lista = modifica((d.exists && d.data().lista) || []);
+    await cfg('ricette').set({ lista: lista });
+    return lista;
+  }
+
+  async function api(p) {
+    const proprietario = !!(auth.currentUser && auth.currentUser.uid === UID_PROPRIETARIO);
+    try {
+      switch (p.action) {
+        case 'init': {
+          const base = await leggiConfig();
+          stato.dati = base.dati;   // serve ai calcoli qui sotto
+          const [gs, commenti] = await Promise.all([db.collection('giorni').get(), leggiCommenti()]);
+          const docs = {};
+          gs.docs.forEach((x) => { docs[x.id] = x.data(); });
+          elencoIso = Object.keys(docs).sort().reverse();
+          const tutti = elencoIso.map((iso) => giornoDaDoc(iso, docs[iso], commenti));
+          const ym = elencoIso.length ? elencoIso[0].slice(0, 7) : '';
+          return {
+            ok: true, ruolo: proprietario ? 'scrittura' : 'lettura', dati: base.dati, giorni: elencoIso.slice(), mesi: elencoMesi(),
+            meseCorrente: ym ? { mese: ym, giorni: tutti.filter((g) => g.data.slice(0, 7) === ym) } : null,
+            tuttiIGiorni: tutti,
+            tokenLettura: proprietario ? base.tokenLettura : '',
+            nonLetti: proprietario ? commenti.filter((c) => !c.letto).map((c) => ({ id: c.id, data: c.data })) : [],
+            notifiche: null
+          };
+        }
+        case 'avvisi':
+          return { ok: true, nonLetti: proprietario ? await commentiNonLetti() : [] };
+        case 'mese': {
+          const ym = String(p.mese || '');
+          if (!/^\d{4}-\d{2}$/.test(ym)) throw new Error('Mese non valido.');
+          const [gs, commenti] = await Promise.all([
+            db.collection('giorni').where('data', '>=', ym + '-01').where('data', '<=', ym + '-31').get(), leggiCommenti()]);
+          return { ok: true, mese: ym, giorni: gs.docs.map((x) => giornoDaDoc(x.id, x.data(), commenti)) };
+        }
+        case 'giorno':
+          return { ok: true, giorno: await leggiGiornoDb(p.data) };
+        case 'salvaPasto': {
+          const i = Number(p.pasto);
+          if (!(i >= 0 && i < stato.dati.pasti.length)) throw new Error('Pasto non valido.');
+          await docGiorno(p.data).update({ ['pasti.' + i]: { alimenti: (p.alimenti || []).map(String), quantita: pulisciQuantita(p.quantita) } });
+          return { ok: true, giorno: await leggiGiornoDb(p.data) };
+        }
+        case 'allenamento':
+          await docGiorno(p.data).update({ ['allenamento.' + (p.tipo === 'cardio' ? 'cardio' : 'muscolare')]: p.valore === true || p.valore === 'true' });
+          return { ok: true, giorno: await leggiGiornoDb(p.data) };
+        case 'nuovoGiorno': {
+          await assicuraElenco();
+          let iso = isoDi(new Date());
+          if (elencoIso.length) { const d = dataDa(elencoIso[0]); d.setDate(d.getDate() + 1); iso = isoDi(d); }
+          await creaGiorno(iso);
+          return { ok: true, data: iso, giorni: elencoIso.slice(), mesi: elencoMesi(), giorno: await leggiGiornoDb(iso) };
+        }
+        case 'aggiungiMese': {
+          await assicuraElenco();
+          let iso = isoDi(new Date());
+          if (elencoIso.length) { const q = elencoIso[0].split('-').map(Number); iso = isoDi(new Date(q[0], q[1], 1)); }
+          await creaGiorno(iso);
+          return { ok: true, nome: meseNome(iso.slice(0, 7)), data: iso, giorni: elencoIso.slice(), mesi: elencoMesi(), giorno: await leggiGiornoDb(iso) };
+        }
+        case 'eliminaGiorno':
+          await assicuraElenco();
+          await eliminaGiorniDb([String(p.data)]);
+          return { ok: true, giorni: elencoIso.slice(), mesi: elencoMesi() };
+        case 'eliminaMese': {
+          await assicuraElenco();
+          const m = elencoMesi().find((x) => x.nome === p.nome);
+          if (!m) throw new Error('Mese non trovato.');
+          await eliminaGiorniDb(elencoIso.filter((d) => d.slice(0, 7) === m.mese));
+          return { ok: true, giorni: elencoIso.slice(), mesi: elencoMesi() };
+        }
+        case 'salvaIngrediente':
+          return { ok: true, ingredienti: await salvaIngredienteDb(String(p.originale || ''), p.ingrediente || {}) };
+        case 'eliminaIngrediente': {
+          const lista = (await listaIngredienti()).filter((a) => a.n !== String(p.nome || ''));
+          await cfg('ingredienti').set({ lista: lista });
+          return { ok: true, ingredienti: lista };
+        }
+        case 'salvaPiano': {
+          const piano = (await cfg('piano').get()).data();
+          const n = (x) => { const v = Number(x); if (!isFinite(v) || v < 0 || v > 100000) throw new Error('Controlla i valori numerici.'); return v; };
+          const ob = p.obiettivi || {};
+          piano.obiettivi = { kcal: n(ob.kcal), proteine: n(ob.proteine), carboidrati: n(ob.carboidrati), grassi: n(ob.grassi) };
+          if (Array.isArray(p.quantita) && p.quantita.length === piano.schema.length) {
+            piano.schema = piano.schema.map((r, i) => Object.assign({}, r, { quantita: p.quantita[i] === '' || p.quantita[i] === null ? '' : n(p.quantita[i]) }));
+          }
+          await cfg('piano').set(piano);
+          return { ok: true, dati: (await leggiConfig()).dati };
+        }
+        case 'aggiungiCommento': {
+          const t = String(p.testo || '').trim();
+          if (!t) throw new Error('Scrivi il commento prima di inviarlo.');
+          if (t.length > 1000) throw new Error('Il commento è troppo lungo (massimo 1000 caratteri).');
+          await db.collection('commenti').add({ data: String(p.data), testo: t, autore: 'Nutrizionista', quando: oraAdesso(), letto: false });
+          return { ok: true, giorno: await leggiGiornoDb(p.data) };
+        }
+        case 'eliminaCommento': {
+          const ref = db.collection('commenti').doc(String(p.id || ''));
+          const d = await ref.get();
+          if (!d.exists) throw new Error('Commento non trovato: forse è già stato eliminato.');
+          await ref.delete();
+          return { ok: true, giorno: await leggiGiornoDb(d.data().data), nonLetti: await commentiNonLetti() };
+        }
+        case 'segnaLetti':
+          await aBlocchi((p.ids || []).slice(0, 200).map((id) => (b) => b.update(db.collection('commenti').doc(String(id)), { letto: true })));
+          return { ok: true, nonLetti: await commentiNonLetti() };
+        case 'salvaNotifiche':
+          throw new Error('Gli avvisi via email non sono disponibili con il nuovo database: i commenti li vedi nell\'app.');
+        case 'salvaRicetta': {
+          const r = p.ricetta || {}, nome = String(r.n || '').trim(), voci = pulisciQuantita(r.voci);
+          if (!nome) throw new Error('Scrivi un nome per la ricetta.');
+          if (!Object.keys(voci).length) throw new Error('La ricetta non ha alimenti.');
+          return { ok: true, ricette: await salvaRicetteDb((l) => l.filter((x) => x.n !== nome).concat([{ n: nome, voci: voci }])) };
+        }
+        case 'eliminaRicetta':
+          return { ok: true, ricette: await salvaRicetteDb((l) => l.filter((x) => x.n !== String(p.nome || ''))) };
+        default:
+          throw new Error('Azione sconosciuta.');
+      }
+    } catch (e) { throw (e && e.code) ? erroreDb(e) : e; }
+  }
+  const chiedi = (parametri) => api(parametri);
+  const invia = (corpo) => api(corpo);
+
+  /* ---------- Import una tantum dal vecchio Google Sheet (tramite lo script) ---------- */
+  async function importaDalFoglio(url, token, avanzamento) {
+    const leggi = async (par) => {
+      const r = await fetch(url + '?' + new URLSearchParams(Object.assign({ token: token }, par)).toString());
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.errore || 'Il foglio non ha risposto correttamente.');
+      return j;
+    };
+    avanzamento('Leggo ingredienti e piano dal foglio…');
+    const ini = await leggi({ action: 'init' });
+    const giorni = [];
+    for (const m of ini.mesi) {
+      avanzamento('Leggo ' + m.nome + '…');
+      giorni.push(...(await leggi({ action: 'mese', mese: m.mese })).giorni);
+    }
+    avanzamento('Scrivo nel database ' + giorni.length + ' giorni…');
+    const ops = [
+      (b) => b.set(cfg('piano'), { pasti: ini.dati.pasti, categorie: ini.dati.categorie, schema: ini.dati.schema, obiettivi: ini.dati.obiettivi }),
+      (b) => b.set(cfg('ingredienti'), { lista: ini.dati.ingredienti }),
+      (b) => b.set(cfg('ricette'), { lista: Array.isArray(ini.dati.ricette) ? ini.dati.ricette : (leggiLocale('ricette') || []) }),
+      (b) => b.set(cfg('condivisione'), { tokenLettura: ini.tokenLettura || '' })
+    ];
+    const commenti = {};
+    giorni.forEach((g) => {
+      const pasti = {};
+      g.pasti.forEach((pp, i) => { pasti[i] = { alimenti: pp.alimenti || [], quantita: pulisciQuantita(pp.quantita) }; });
+      ops.push((b) => b.set(docGiorno(g.data), { data: g.data, pasti: pasti, allenamento: { muscolare: !!g.allenamento.muscolare, cardio: !!g.allenamento.cardio } }));
+      (g.commenti || []).forEach((c) => { commenti[c.id] = c; });
+    });
+    Object.keys(commenti).forEach((id) => {
+      const c = commenti[id];
+      ops.push((b) => b.set(db.collection('commenti').doc(id.replace(/\//g, '_')), { data: c.data, testo: c.testo, autore: c.autore, quando: c.quando, letto: !!c.letto }));
+    });
+    await aBlocchi(ops);
+    return { giorni: giorni.length, ingredienti: ini.dati.ingredienti.length, commenti: Object.keys(commenti).length };
+  }
+  function mostraImportazione() {
+    $('impostazioni').classList.add('nascosto'); $('app').classList.remove('nascosto');
+    testataSemplice('Piano alimentare', 'nuovo database');
+    $('contenuto').innerHTML = '<div class="scatola" style="padding:16px">' +
+      '<p style="margin:0 0 12px"><b>Il database è pronto ma vuoto.</b> Porto qui ingredienti, piano, ricette, commenti e tutti i giorni dal Google Sheet. Il foglio resta com\'è, come copia di sicurezza.</p>' +
+      '<label class="campo"><span>Indirizzo dello script (/exec)</span><input id="imp-url" value="' + esc(localStorage.getItem('pa_url') || '') + '" autocapitalize="off"></label>' +
+      '<label class="campo"><span>Parola segreta dello script</span><input id="imp-token" type="password" value="' + esc(localStorage.getItem('pa_token') || '') + '" autocapitalize="off"></label>' +
+      '<button class="bottone largo" id="importa">Importa dal foglio</button><p class="nota" id="imp-stato" style="margin:12px 0 0"></p></div>';
+    $('importa').onclick = async () => {
+      const url = $('imp-url').value.trim(), token = $('imp-token').value.trim();
+      if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url) || !token) { avviso('Servono l\'indirizzo dello script e la parola segreta.'); return; }
+      $('importa').disabled = true;
+      try {
+        const r = await importaDalFoglio(url, token, (t) => { $('imp-stato').textContent = t; });
+        $('imp-stato').textContent = 'Fatto: ' + r.giorni + ' giorni, ' + r.ingredienti + ' ingredienti, ' + r.commenti + ' commenti. Ricarico l\'app…';
+        Object.keys(localStorage).forEach((k) => { if (k.indexOf('pa_mese_') === 0) localStorage.removeItem(k); });
+        setTimeout(() => location.reload(), 1500);
+      } catch (e) {
+        $('imp-stato').textContent = 'Non riuscito: ' + ((e && e.code) ? erroreDb(e).message : e.message);
+        $('importa').disabled = false;
+      }
+    };
+  }
   let inAttesa = 0;
   function attesa(si) { inAttesa += si ? 1 : -1; $('attesa').classList.toggle('nascosto', inAttesa <= 0); }
   let timerAvviso;
@@ -565,7 +877,19 @@
 
   /* ---------- Avvio ---------- */
   async function avvia() {
-    if (!stato.url || !stato.token) { mostraImpostazioni(); return; }
+    let utente = await primoUtente;
+    if (daLink && !utente) {
+      // Link della nutrizionista: accede da sola con la password contenuta nel link
+      try { utente = (await auth.signInWithEmailAndPassword(EMAIL_NUTRIZIONISTA, hash.get('l'))).user; }
+      catch (e) {
+        $('app').classList.remove('nascosto'); testataSemplice('Piano alimentare', '');
+        $('contenuto').innerHTML = '<div class="messaggio"><p>Questo link non è più valido. Chiedi un link nuovo.</p></div>';
+        return;
+      }
+    }
+    if (!utente) { mostraImpostazioni(); return; }
+    stato.ruolo = daLink || utente.uid !== UID_PROPRIETARIO ? 'lettura' : 'scrittura';
+    if (!daLink) localStorage.setItem('pa_ruolo', stato.ruolo);
     $('impostazioni').classList.add('nascosto');
     $('app').classList.remove('nascosto');
     // Mostra subito quello che c'è sul telefono
@@ -580,8 +904,6 @@
     if (!silenzioso) attesa(true);
     try {
       const j = await chiedi({ action: 'init' });
-      stato.ruolo = daLink ? 'lettura' : j.ruolo;
-      if (!daLink) localStorage.setItem('pa_ruolo', j.ruolo);
       stato.dati = j.dati; stato.giorni = j.giorni; stato.mesi = j.mesi; stato.tokenLettura = j.tokenLettura || '';
       // Con lo script aggiornato le ricette stanno nel foglio; altrimenti restano su questo telefono
       stato.ricetteSulFoglio = Array.isArray(j.dati.ricette);
@@ -590,7 +912,11 @@
       stato.nonLetti = j.nonLetti || []; stato.notifiche = j.notifiche || null; aggiornaContatore();
       scriviLocale('dati', j.dati); scriviLocale('giorni', j.giorni); scriviLocale('mesi', j.mesi);
       // Lo script aggiornato manda già il mese più recente: niente seconda richiesta
-      if (j.meseCorrente && Array.isArray(j.meseCorrente.giorni)) {
+      if (Array.isArray(j.tuttiIGiorni)) {
+        const perMese = {};
+        j.tuttiIGiorni.forEach((g) => { const ym = g.data.slice(0, 7); (perMese[ym] = perMese[ym] || {})[g.data] = g; });
+        Object.keys(perMese).forEach((ym) => { stato.cache[ym] = perMese[ym]; stato.caricati[ym] = Date.now(); scriviLocale('mese_' + ym, perMese[ym]); });
+      } else if (j.meseCorrente && Array.isArray(j.meseCorrente.giorni)) {
         const c = {};
         j.meseCorrente.giorni.forEach((g) => { c[g.data] = g; });
         stato.cache[j.meseCorrente.mese] = c; stato.caricati[j.meseCorrente.mese] = Date.now();
@@ -599,11 +925,14 @@
       if (!stato.corrente || stato.giorni.indexOf(stato.corrente) < 0) stato.corrente = stato.giorni[0] || null;
       if (stato.vista === 'diario') await vaiA(stato.corrente); else disegnaVista();
     } catch (e) {
-      if (!stato.dati) {
+      if (e && e.vuoto) {
+        if (lettura()) $('contenuto').innerHTML = '<div class="messaggio"><p>Il diario non è ancora disponibile.</p></div>';
+        else mostraImportazione();
+      } else if (!stato.dati) {
         $('contenuto').innerHTML = '<div class="messaggio"><p>' + esc(e.message) + '</p><button class="bottone secondario" id="riprova">Riprova</button>' +
-          (daLink ? '' : ' <button class="bottone secondario" id="cambia">Cambia collegamento</button>') + '</div>';
+          (daLink ? '' : ' <button class="bottone secondario" id="cambia">Esci dall\'account</button>') + '</div>';
         $('riprova').onclick = avvia;
-        if ($('cambia')) $('cambia').onclick = mostraImpostazioni;
+        if ($('cambia')) $('cambia').onclick = esci;
       } else avviso(e.message);
     } finally { if (!silenzioso) attesa(false); }
   }
@@ -611,17 +940,24 @@
   function mostraImpostazioni() {
     $('app').classList.add('nascosto');
     $('impostazioni').classList.remove('nascosto');
-    $('url').value = daLink ? '' : stato.url;
-    $('token').value = daLink ? '' : stato.token;
   }
-  $('collega').onclick = () => {
-    const url = $('url').value.trim(), token = $('token').value.trim();
-    if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url)) { avviso('L\'indirizzo deve iniziare con https://script.google.com e finire con /exec.'); return; }
-    if (!token) { avviso('Scrivi la parola segreta che hai messo nello script.'); return; }
-    if (daLink) { location.hash = ''; }
-    localStorage.setItem('pa_url', url); localStorage.setItem('pa_token', token); localStorage.removeItem('pa_ruolo');
-    location.reload();
+  $('accedi').onclick = async () => {
+    const email = $('email').value.trim(), password = $('password').value;
+    if (!email || !password) { avviso('Scrivi email e password.'); return; }
+    $('accedi').disabled = true;
+    try { await auth.signInWithEmailAndPassword(email, password); location.reload(); }
+    catch (e) {
+      const c = String(e.code || '');
+      avviso(/invalid|wrong|not-found|credential/.test(c) ? 'Email o password non corrette.' : (/too-many/.test(c) ? 'Troppi tentativi: aspetta qualche minuto.' : 'Accesso non riuscito: ' + (e.message || c)));
+      $('accedi').disabled = false;
+    }
   };
+  async function esci() {
+    if (!confirm('Vuoi uscire dall\'account su questo telefono?')) return;
+    await auth.signOut();
+    Object.keys(localStorage).forEach((k) => { if (k.indexOf(prefisso) === 0) localStorage.removeItem(k); });
+    location.hash = ''; location.reload();
+  }
 
   /* ---------- Navigazione tra sezioni ---------- */
   document.querySelectorAll('.scheda').forEach((b) => b.onclick = () => { stato.vista = b.dataset.vista; window.scrollTo(0, 0); disegnaVista(); });
@@ -1402,7 +1738,7 @@
     if (!lettura()) {
       html += '<div class="azioni"><button class="bottone largo" id="salva-piano">Salva il piano</button></div>';
       const nt = stato.notifiche || { email: false, indirizzo: '' };
-      notificheHtml = '<div class="etichetta-sezione">Notifiche</div><div class="scatola">' +
+      if (stato.notifiche) notificheHtml = '<div class="etichetta-sezione">Notifiche</div><div class="scatola">' +
         '<p class="nota" style="margin:12px 16px 0">I commenti della nutrizionista ti arrivano sempre dentro l\'app. Se vuoi, puoi ricevere anche un\'email.</p>' +
         '<div class="riga-impostazione"><span style="font-weight:600">Avvisami anche via email</span>' +
         '<button class="interruttore" id="notifica-email" aria-pressed="' + nt.email + '" style="border:0;padding:0;background:none"><span class="levetta"></span></button></div>' +
@@ -1412,8 +1748,8 @@
       html += '<div class="etichetta-sezione">Condivisione</div><div class="scatola" style="padding:14px 16px">' +
         (stato.tokenLettura
           ? '<p style="margin:0 0 12px">Manda questo link alla tua nutrizionista: vedrà diario, mesi, ingredienti e piano e potrà commentare le giornate, senza poter modificare nulla.</p><button class="bottone largo" id="condividi">Condividi il link in sola lettura</button>'
-          : '<p class="vuoto" style="margin:0">Per creare il link della nutrizionista imposta <b>TOKEN_LETTURA</b> nello script (una parola diversa dalla tua, almeno 16 caratteri) e pubblica una nuova versione.</p>') +
-        '</div><div class="azioni"><button class="bottone secondario largo" id="cambia-coll">Cambia collegamento al foglio</button></div>';
+          : '<p class="vuoto" style="margin:0">Il link per la nutrizionista non è ancora configurato.</p>') +
+        '</div><div class="azioni"><button class="bottone secondario largo" id="cambia-coll">Esci dall\'account</button></div>';
     } else {
       html += '<p class="centrato"><span class="distintivo">Sola lettura</span></p>';
     }
@@ -1429,14 +1765,14 @@
       } catch (e) { avviso(e.message); return false; }
       finally { attesa(false); }
     };
-    $('notifica-email').onclick = async () => {
+    if ($('notifica-email')) $('notifica-email').onclick = async () => {
       const acceso = $('notifica-email').getAttribute('aria-pressed') !== 'true';
       $('notifica-email').setAttribute('aria-pressed', String(acceso));
       $('blocco-email').classList.toggle('nascosto', !acceso);
       if (!acceso) { if (!(await salvaNotifiche(false))) { $('notifica-email').setAttribute('aria-pressed', 'true'); $('blocco-email').classList.remove('nascosto'); } }
       else $('indirizzo-email').focus();
     };
-    $('salva-notifiche').onclick = () => salvaNotifiche(true);
+    if ($('salva-notifiche')) $('salva-notifiche').onclick = () => salvaNotifiche(true);
     $('salva-piano').onclick = async () => {
       const leggi = (el) => { const v = el.value.trim().replace(',', '.'); return v === '' ? '' : Number(v); };
       const obiettivi = { kcal: stato.dati.obiettivi.kcal };  // non si mostra, resta quello del foglio
@@ -1453,13 +1789,13 @@
       finally { attesa(false); }
     };
     if ($('condividi')) $('condividi').onclick = async () => {
-      const link = location.origin + location.pathname + '#u=' + encodeURIComponent(stato.url) + '&l=' + encodeURIComponent(stato.tokenLettura);
+      const link = location.origin + location.pathname + '#l=' + encodeURIComponent(stato.tokenLettura);
       try {
         if (navigator.share) await navigator.share({ title: 'Il mio piano alimentare', url: link });
         else { await navigator.clipboard.writeText(link); avviso('Link copiato.'); }
       } catch (e) { /* condivisione annullata */ }
     };
-    $('cambia-coll').onclick = () => { if (confirm('Vuoi cambiare l\'indirizzo dello script o la parola segreta?')) mostraImpostazioni(); };
+    $('cambia-coll').onclick = esci;
   }
 
   // Tornando sull'app ricarica il mese mostrato (i dati possono essere cambiati dal computer)

@@ -396,7 +396,10 @@
   /* Schede dei pasti ordinate: nome, kcal e +, poi l'elenco di cosa si è mangiato */
   .pasti .pasto { display: block; padding: 16px 16px 14px; }
   .testa-pasto { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .testa-pasto .testo-pasto { display: grid; gap: 6px; }
+  .testa-pasto .testo-pasto { display: grid; gap: 6px; flex: 1; min-width: 0; }
+  .destra-pasto { display: flex; align-items: center; flex: none; }
+  .destra-pasto .icona-pasto { width: 54px; height: 54px; border-radius: 50%; font-size: 26px; box-shadow: 0 0 0 3px var(--carta); }
+  .destra-pasto .piu-pasto { margin-left: -12px; position: relative; box-shadow: 0 0 0 3px var(--carta); }
   .pasti .pasto h2 { font-size: 19px; }
   .kcal-pasto { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--inchiostro-tenue); }
   .kcal-pasto b { font-size: 19px; font-weight: 700; color: var(--inchiostro); letter-spacing: -0.01em; }
@@ -478,7 +481,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-06-1';
+  const VERSIONE = '2026-11-06-3';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -1088,11 +1091,13 @@
     html += '<div class="macro"><div><strong>' + fmt(g.totale.proteine) + ' g</strong><span>Proteine</span></div>' +
       '<div><strong>' + fmt(g.totale.carboidrati) + ' g</strong><span>Carboidrati</span></div>' +
       '<div><strong>' + fmt(g.totale.grassi) + ' g</strong><span>Grassi</span></div></div>';
+    const iconePasti = ['☕️', '🍎', '🍝', '🍌', '🌙'];
     html += '<div class="etichetta-sezione">Pasti del giorno</div><div class="pasti">' + g.pasti.map((p, i) =>
       '<button class="pasto" data-pasto="' + i + '"' + (lettura() ? ' disabled' : '') + '>' +
       '<span class="testa-pasto"><span class="testo-pasto"><h2>' + esc(p.nome) + '</h2>' +
       '<span class="kcal-pasto"><span class="fiamma" aria-hidden="true">' + ICONA_FIAMMA + '</span><b>' + fmt(p.kcal) + '</b> kcal</span></span>' +
-      (lettura() ? '' : '<span class="piu-pasto" aria-hidden="true">' + ICONE.piu + '</span>') + '</span>' +
+      '<span class="destra-pasto"><span class="icona-pasto c' + (i % 5) + '" aria-hidden="true">' + (iconePasti[i] || '🍽️') + '</span>' +
+      (lettura() ? '' : '<span class="piu-pasto" aria-hidden="true">' + ICONE.piu + '</span>') + '</span></span>' +
       (p.alimenti.length ? '<span class="lista-cibi">' + p.alimenti.map((n) => rigaCibo(n, (p.quantita || {})[n], p.nome)).join('') + '</span>'
         : '<span class="vuoto">' + (lettura() ? 'Niente' : 'Tocca per scegliere gli alimenti') + '</span>') +
       '</button>').join('') + '</div>';

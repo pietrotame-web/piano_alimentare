@@ -375,13 +375,15 @@
   .resto-calorie { margin: 10px 0 0; font-size: 14px; font-weight: 700; color: var(--viola); }
   .resto-calorie.oltre { color: var(--rosso); }
 
-  /* Olio pronto a pranzo e cena */
-  .voce-olio { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin: 8px 0 2px; border-radius: 16px; background: var(--carta); box-shadow: 0 1px 3px rgba(20,20,40,.06); text-align: left; font-weight: 600; }
-  .voce-olio .nome { flex: 1; }
-  .voce-olio .nome small { display: block; font-size: 12px; font-weight: 400; color: var(--inchiostro-tenue); }
-  .voce-olio[aria-pressed="true"] { background: #F1FBF3; box-shadow: inset 0 0 0 1.5px #9EDDAE; }
-  .voce-olio[aria-pressed="true"] .aggiungi-ricetta { color: var(--verde); }
-
+  /* Olio a pranzo e cena: 3 cucchiai da toccare, come i bicchieri d'acqua */
+  .tracker-olio { margin: 8px 0 2px; padding: 12px 14px 10px; border-radius: 18px; background: var(--carta); box-shadow: 0 1px 3px rgba(20,20,40,.06); }
+  .testa-olio { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .testa-olio span { font-size: 13px; color: var(--inchiostro-tenue); }
+  .cucchiai { display: flex; gap: 14px; margin-top: 6px; }
+  .cucchiai button { width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center; background: #F7F7FA; transition: background .15s, transform .1s; }
+  .cucchiai button[aria-pressed="true"] { background: #FFF4D6; }
+  .cucchiai button:active { transform: scale(.94); }
+  .cucchiai svg { width: 38px; height: 38px; }
   /* Carosello: calorie, poi macronutrienti */
   .carosello { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   .carosello::-webkit-scrollbar { display: none; }
@@ -390,8 +392,6 @@
   .puntini { display: flex; justify-content: center; gap: 7px; padding: 12px 0 0; }
   .puntini button { width: 8px; height: 8px; border-radius: 50%; background: #D6D6E0; padding: 0; transition: width .2s; }
   .puntini button[aria-current="true"] { background: var(--inchiostro); width: 20px; border-radius: 4px; }
-  .icona-olio { background: #FFF4D6; }
-  .icona-olio svg { width: 24px; height: 24px; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -459,7 +459,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-05-5';
+  const VERSIONE = '2026-11-05-6';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -1180,13 +1180,15 @@
     try { if (n && navigator.setAppBadge) navigator.setAppBadge(n); else if (navigator.clearAppBadge) navigator.clearAppBadge(); } catch (e) { /* non supportato */ }
   }
 
-  // Cucchiaio con l'olio (disegno vettoriale)
-  const ICONA_OLIO = '<svg viewBox="0 0 32 32"><g transform="rotate(-38 15 18)">' +
-    '<rect x="19" y="16.3" width="12" height="3.4" rx="1.7" fill="#A3A3B8"/>' +
-    '<ellipse cx="12" cy="18" rx="8.2" ry="5.6" fill="#BFBFD0"/>' +
-    '<ellipse cx="12" cy="18" rx="6.4" ry="4" fill="#E9B23F"/>' +
-    '<ellipse cx="10" cy="16.7" rx="2.3" ry="1.1" fill="#FFE29A"/></g>' +
-    '<path d="M8.5 2.5c1.9 2.5 2.9 4.1 2.9 5.3a2.9 2.9 0 0 1-5.8 0c0-1.2 1-2.8 2.9-5.3z" fill="#E9B23F"/></svg>';
+  // Cucchiaio con l'olio (disegno vettoriale): pieno se l'olio è stato messo, vuoto altrimenti
+  function iconaOlio(pieno) {
+    return '<svg viewBox="0 0 32 32" aria-hidden="true"><g transform="rotate(-38 15 18)">' +
+      '<rect x="19" y="16.3" width="12" height="3.4" rx="1.7" fill="' + (pieno ? '#A3A3B8' : '#CFCFDC') + '"/>' +
+      '<ellipse cx="12" cy="18" rx="8.2" ry="5.6" fill="' + (pieno ? '#BFBFD0' : '#DDDDE8') + '"/>' +
+      '<ellipse cx="12" cy="18" rx="6.4" ry="4" fill="' + (pieno ? '#E9B23F' : '#F4F4F8') + '"/>' +
+      (pieno ? '<ellipse cx="10" cy="16.7" rx="2.3" ry="1.1" fill="#FFE29A"/>' : '') + '</g>' +
+      (pieno ? '<path d="M8.5 2.5c1.9 2.5 2.9 4.1 2.9 5.3a2.9 2.9 0 0 1-5.8 0c0-1.2 1-2.8 2.9-5.3z" fill="#E9B23F"/>' : '') + '</svg>';
+  }
   function impostaCarosello() {
     const c = $('carosello'); if (!c) return;
     const puntini = () => document.querySelectorAll('#puntini button').forEach((b, i) => b.setAttribute('aria-current', String(i === (stato.slide || 0))));
@@ -1438,10 +1440,11 @@
     const nomePasto = stato.giorno.pasti[stato.pasto].nome;
     let olio = '';
     if (/^(pranzo|cena)$/i.test(nomePasto) && ingrediente('Olio EVO') && !stato.filtro && (!q || 'olio evo'.includes(q))) {
-      const preso = stato.scelta.includes('Olio EVO');
-      olio = '<button class="voce-olio" id="voce-olio" aria-pressed="' + preso + '"><span class="icona-ricetta icona-olio" aria-hidden="true">' + ICONA_OLIO + '</span>' +
-        '<span class="nome">Olio EVO<small>' + (preso ? 'Aggiunto: ' + fmt(stato.qta['Olio EVO'] !== undefined ? stato.qta['Olio EVO'] : 3, 1) + ' cucchiai. Tocca per toglierlo' : '3 cucchiai, tocca per aggiungerlo') + '</small></span>' +
-        '<span class="aggiungi-ricetta">' + (preso ? '✓' : '+ 3') + '</span></button>';
+      const quanti = stato.scelta.includes('Olio EVO') ? Number(stato.qta['Olio EVO'] !== undefined ? stato.qta['Olio EVO'] : 3) : 0;
+      olio = '<div class="tracker-olio"><div class="testa-olio"><b>Olio EVO</b><span>' +
+        (quanti ? fmt(quanti, 1) + (quanti === 1 ? ' cucchiaio' : ' cucchiai') : 'tocca i cucchiai che hai usato') + '</span></div>' +
+        '<div class="cucchiai">' + [1, 2, 3].map((n) => '<button data-cucchiai="' + n + '" aria-pressed="' + (quanti >= n) + '" aria-label="' + n + (n === 1 ? ' cucchiaio' : ' cucchiai') + ' di olio">' + iconaOlio(quanti >= n) + '</button>').join('') +
+        '</div></div>';
     }
     const testoCerca = $('cerca').value.trim();
     const nuova = '<button class="voce-nuova" id="voce-nuova"><span class="piu">+</span><span>' +
@@ -1449,12 +1452,16 @@
       '<small>Scrivi tu quantità e grammi, lo ritrovi poi tra gli ingredienti</small></span></button>';
     $('lista-alimenti').innerHTML = olio + (html ? '' : '<p class="vuoto">Nessun alimento trovato.</p>') + nuova + html;
     $('voce-nuova').onclick = () => nuovoPersonalizzato(testoCerca);
-    if ($('voce-olio')) $('voce-olio').onclick = () => {
+    // Tocchi il 2° cucchiaio: 2 cucchiai. Ritocchi quello già pieno più a destra: uno in meno
+    $('lista-alimenti').querySelectorAll('[data-cucchiai]').forEach((b) => b.onclick = () => {
+      const attuali = stato.scelta.includes('Olio EVO') ? Number(stato.qta['Olio EVO'] !== undefined ? stato.qta['Olio EVO'] : 3) : 0;
+      let n = Number(b.dataset.cucchiai);
+      if (attuali === n) n -= 1;
       const i = stato.scelta.indexOf('Olio EVO');
-      if (i >= 0) { stato.scelta.splice(i, 1); delete stato.qta['Olio EVO']; }
-      else { stato.scelta.push('Olio EVO'); stato.qta['Olio EVO'] = 3; }
+      if (n <= 0) { if (i >= 0) stato.scelta.splice(i, 1); delete stato.qta['Olio EVO']; }
+      else { if (i < 0) stato.scelta.push('Olio EVO'); stato.qta['Olio EVO'] = n; }
       disegnaListaAlimenti();
-    };
+    });
     $('lista-alimenti').querySelectorAll('.voce[data-nome]').forEach((b) => b.onclick = () => alterna(b.dataset.nome, b));
     $('lista-alimenti').querySelectorAll('.voce-ricetta').forEach((b) => b.onclick = () => applicaRicetta(stato.ricette.find((r) => r.n === b.dataset.ricetta)));
     disegnaSelezionati();

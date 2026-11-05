@@ -481,7 +481,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-06-3';
+  const VERSIONE = '2026-11-06-4';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -667,12 +667,32 @@
     return lista;
   }
 
+  // Ingredienti aggiunti da Claude: l'app li inserisce una volta sola (se li elimini non ricompaiono)
+  const AGGIUNTE_INGREDIENTI = [
+    { id: '2026-11-06-caffe-ginseng', voci: [
+      { c: 'Extra', n: 'Caffè espresso', u: 'pz', p: 1, k: 2, pr: 0.1, ca: 0.3, gr: 0, f: 'Stima: espresso senza zucchero (1-10 kcal a tazzina secondo le fonti); 1 pz = 1 tazzina' },
+      { c: 'Extra', n: 'Caffè al ginseng', u: 'pz', p: 1, k: 60, pr: 1, ca: 9, gr: 2.3, f: 'Stima: ginseng da bar o in capsula, già zuccherato (30-80 kcal a tazzina secondo le fonti); 1 pz = 1 tazzina' }
+    ] }
+  ];
+  async function applicaAggiunte() {
+    const m = await cfg('aggiunte').get();
+    const fatte = (m.exists && m.data().fatte) || [];
+    const daFare = AGGIUNTE_INGREDIENTI.filter((a) => fatte.indexOf(a.id) < 0);
+    if (!daFare.length) return null;
+    const lista = await listaIngredienti();
+    daFare.forEach((a) => a.voci.forEach((v) => { if (!lista.some((x) => x.n === v.n)) lista.push(v); }));
+    await cfg('ingredienti').set({ lista: lista });
+    await cfg('aggiunte').set({ fatte: fatte.concat(daFare.map((a) => a.id)) });
+    return lista;
+  }
+
   async function api(p) {
     const proprietario = !!(auth.currentUser && auth.currentUser.uid === UID_PROPRIETARIO);
     try {
       switch (p.action) {
         case 'init': {
           const base = await leggiConfig();
+          if (proprietario) { try { const l = await applicaAggiunte(); if (l) base.dati.ingredienti = l; } catch (e) { /* riprova alla prossima apertura */ } }
           stato.dati = base.dati;   // serve ai calcoli qui sotto
           const [gs, commenti] = await Promise.all([db.collection('giorni').get(), leggiCommenti()]);
           const docs = {};

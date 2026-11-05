@@ -363,6 +363,17 @@
   .aggiungi-ricetta { font-size: 13px; font-weight: 700; color: var(--viola); white-space: nowrap; }
   .riga-titoletto { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .riga-titoletto button { flex: none; font-size: 12px; font-weight: 700; color: var(--viola); background: var(--viola-chiaro); border-radius: 999px; padding: 6px 10px; }
+
+  /* Anello delle calorie */
+  .scheda-calorie { margin: 18px 16px 0; padding: 18px 14px 14px; background: var(--carta); border-radius: 24px; box-shadow: var(--ombra); display: flex; flex-direction: column; align-items: center; }
+  .scheda-calorie .titolo-grafico { align-self: flex-start; margin-left: 4px; }
+  .anello { position: relative; width: min(56vw, 210px); aspect-ratio: 1; }
+  .anello svg { width: 100%; height: 100%; display: block; }
+  .centro-anello { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+  .centro-anello small { font-size: 12px; font-weight: 600; color: var(--inchiostro-tenue); }
+  .centro-anello strong { font-size: clamp(30px, 9vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
+  .resto-calorie { margin: 10px 0 0; font-size: 14px; font-weight: 700; color: var(--viola); }
+  .resto-calorie.oltre { color: var(--rosso); }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -430,7 +441,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-05-2';
+  const VERSIONE = '2026-11-05-3';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -1034,7 +1045,7 @@
 
   function disegnaGiorno() {
     const g = stato.giorno;
-    let html = '<div class="grafico-giorno">' +
+    let html = schedaCalorie(g.totale.kcal, stato.dati.obiettivi.kcal) + '<div class="grafico-giorno">' +
       '<h3 class="titolo-grafico">Macronutrienti (g)</h3><div class="area-grafico">' + graficoGrammi(g.totale) + '</div></div>';
     html += '<div class="macro"><div><strong>' + fmt(g.totale.proteine) + ' g</strong><span>Proteine</span></div>' +
       '<div><strong>' + fmt(g.totale.carboidrati) + ' g</strong><span>Carboidrati</span></div>' +
@@ -1149,6 +1160,18 @@
     try { if (n && navigator.setAppBadge) navigator.setAppBadge(n); else if (navigator.clearAppBadge) navigator.clearAppBadge(); } catch (e) { /* non supportato */ }
   }
 
+  // Anello delle calorie: si riempie verso l'obiettivo del Piano
+  function schedaCalorie(kcal, obiettivo) {
+    const r = 78, c = 2 * Math.PI * r, frazione = obiettivo > 0 ? Math.min(kcal / obiettivo, 1) : 0;
+    const resto = obiettivo - kcal, oltre = resto < 0;
+    return '<div class="scheda-calorie"><h3 class="titolo-grafico">Calorie</h3><div class="anello">' +
+      '<svg viewBox="0 0 200 200" role="img" aria-label="' + fmt(kcal) + ' kcal di ' + fmt(obiettivo) + '">' +
+      '<circle cx="100" cy="100" r="' + r + '" fill="none" stroke="#EEEAF8" stroke-width="16"/>' +
+      (frazione > 0 ? '<circle cx="100" cy="100" r="' + r + '" fill="none" stroke="' + (oltre ? '#EF4C46' : '#8E72F2') + '" stroke-width="16" stroke-linecap="round" stroke-dasharray="' +
+        (frazione * c).toFixed(1) + ' ' + c.toFixed(1) + '" transform="rotate(-90 100 100)"/>' : '') + '</svg>' +
+      '<div class="centro-anello"><small>di ' + fmt(obiettivo) + ' kcal</small><strong>' + fmt(kcal) + '</strong></div></div>' +
+      '<p class="resto-calorie' + (oltre ? ' oltre' : '') + '">' + (obiettivo > 0 ? (oltre ? fmt(-resto) + ' kcal oltre l\'obiettivo' : fmt(resto) + ' kcal rimanenti') : '') + '</p></div>';
+  }
   function graficoGrammi(t) {
     const voci = [['Proteine', t.proteine, '#FFC978'], ['Carboidrati', t.carboidrati, '#9EDDAE'], ['Grassi', t.grassi, '#9FD8EC']];
     const max = Math.max(1, ...voci.map((v) => v[1]));
@@ -1724,7 +1747,7 @@
     const ob = stato.dati.obiettivi, dis = lettura() ? ' disabled' : '';
     let notificheHtml = '';
     let html = '<div class="etichetta-sezione">Obiettivi giornalieri</div><div class="scatola">' +
-      [['proteine', 'Proteine (g)'], ['carboidrati', 'Carboidrati (g)'], ['grassi', 'Grassi (g)']].map((x) =>
+      [['kcal', 'Calorie (kcal)'], ['proteine', 'Proteine (g)'], ['carboidrati', 'Carboidrati (g)'], ['grassi', 'Grassi (g)']].map((x) =>
         '<div class="riga-piano"><span>' + x[1] + '</span><input data-ob="' + x[0] + '" inputmode="decimal" value="' + esc(ob[x[0]]) + '"' + dis + '></div>').join('') + '</div>';
     html += '<div class="etichetta-sezione">Quantità per pasto</div><div class="scatola">';
     let ultimoPasto = null;
@@ -1775,7 +1798,7 @@
     if ($('salva-notifiche')) $('salva-notifiche').onclick = () => salvaNotifiche(true);
     $('salva-piano').onclick = async () => {
       const leggi = (el) => { const v = el.value.trim().replace(',', '.'); return v === '' ? '' : Number(v); };
-      const obiettivi = { kcal: stato.dati.obiettivi.kcal };  // non si mostra, resta quello del foglio
+      const obiettivi = {};
       document.querySelectorAll('[data-ob]').forEach((el) => { obiettivi[el.dataset.ob] = leggi(el); });
       const quantita = stato.dati.schema.map((r) => r.quantita);
       document.querySelectorAll('[data-q]').forEach((el) => { quantita[Number(el.dataset.q)] = leggi(el); });

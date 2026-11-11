@@ -481,7 +481,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-06-4';
+  const VERSIONE = '2026-11-11-1';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -674,15 +674,42 @@
       { c: 'Extra', n: 'Caffè al ginseng', u: 'pz', p: 1, k: 60, pr: 1, ca: 9, gr: 2.3, f: 'Stima: ginseng da bar o in capsula, già zuccherato (30-80 kcal a tazzina secondo le fonti); 1 pz = 1 tazzina' }
     ] }
   ];
+  // Pasti dettati a Claude: l'app li scrive una volta sola, e solo nei pasti ancora vuoti (non sovrascrive niente).
+  // Ogni pasto: [alimenti, quantità]; l'indice è quello di stato.dati.pasti (0 colazione … 4 cena).
+  const PS = 'Pasta senza glutine (grano saraceno/avena/riso/mais)';
+  const AGGIUNTE_DIARIO = [
+    { id: '2026-11-10-diario', data: '2026-11-10', pasti: {
+      0: [['Pane senza glutine', 'Crema di mandorle 100%', 'Marmellata 100% frutta'], {}],
+      1: [['Triangolini di mais', 'Fruttino'], { 'Triangolini di mais': 20 }],
+      2: [[PS, 'Carne bianca', 'Vellutata di verdure', 'Olio EVO'], { [PS]: 110, 'Carne bianca': 170, 'Vellutata di verdure': 200, 'Olio EVO': 3 }],
+      3: [['Banana', 'Gallette al cioccolato'], {}],
+      4: [['Verdura cruda', 'Patate', 'Tonno', 'Olio EVO'], { 'Verdura cruda': 100, 'Patate': 150, 'Tonno': 110, 'Olio EVO': 2 }]
+    } }
+  ];
   async function applicaAggiunte() {
     const m = await cfg('aggiunte').get();
     const fatte = (m.exists && m.data().fatte) || [];
-    const daFare = AGGIUNTE_INGREDIENTI.filter((a) => fatte.indexOf(a.id) < 0);
-    if (!daFare.length) return null;
-    const lista = await listaIngredienti();
-    daFare.forEach((a) => a.voci.forEach((v) => { if (!lista.some((x) => x.n === v.n)) lista.push(v); }));
-    await cfg('ingredienti').set({ lista: lista });
-    await cfg('aggiunte').set({ fatte: fatte.concat(daFare.map((a) => a.id)) });
+    const ingr = AGGIUNTE_INGREDIENTI.filter((a) => fatte.indexOf(a.id) < 0);
+    const diario = AGGIUNTE_DIARIO.filter((a) => fatte.indexOf(a.id) < 0);
+    if (!ingr.length && !diario.length) return null;
+    let lista = null;
+    if (ingr.length) {
+      lista = await listaIngredienti();
+      ingr.forEach((a) => a.voci.forEach((v) => { if (!lista.some((x) => x.n === v.n)) lista.push(v); }));
+      await cfg('ingredienti').set({ lista: lista });
+    }
+    for (const a of diario) {
+      const ref = docGiorno(a.data), d = await ref.get();
+      const pasti = (d.exists && d.data().pasti) || {};
+      Object.keys(a.pasti).forEach((i) => {
+        if (pasti[i] && (pasti[i].alimenti || []).length) return;   // pasto già compilato: non si tocca
+        pasti[i] = { alimenti: a.pasti[i][0], quantita: a.pasti[i][1] };
+      });
+      [0, 1, 2, 3, 4].forEach((i) => { if (!pasti[i]) pasti[i] = { alimenti: [], quantita: {} }; });
+      if (d.exists) await ref.update({ pasti: pasti });
+      else await ref.set({ data: a.data, pasti: pasti, allenamento: { muscolare: false, cardio: false } });
+    }
+    await cfg('aggiunte').set({ fatte: fatte.concat(ingr.map((a) => a.id), diario.map((a) => a.id)) });
     return lista;
   }
 

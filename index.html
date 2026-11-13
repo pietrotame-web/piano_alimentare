@@ -481,7 +481,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-11-1';
+  const VERSIONE = '2026-11-13-1';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -684,6 +684,19 @@
       2: [[PS, 'Carne bianca', 'Vellutata di verdure', 'Olio EVO'], { [PS]: 110, 'Carne bianca': 170, 'Vellutata di verdure': 200, 'Olio EVO': 3 }],
       3: [['Banana', 'Gallette al cioccolato'], {}],
       4: [['Verdura cruda', 'Patate', 'Tonno', 'Olio EVO'], { 'Verdura cruda': 100, 'Patate': 150, 'Tonno': 110, 'Olio EVO': 2 }]
+    } },
+    // Spuntino di tutta la settimana: 20 g di triangolini di mais e un fruttino (solo dove manca)
+    ...['2026-11-09', '2026-11-11'].map((d) => ({ id: d + '-spuntino', data: d, pasti: { 1: [['Triangolini di mais', 'Fruttino'], { 'Triangolini di mais': 20 }] } })),
+    { id: '2026-11-12-diario', data: '2026-11-12', pasti: {
+      0: [['Latte parzialmente scremato', 'Corn flakes', 'Cioccolato fondente'], { 'Corn flakes': 40, 'Cioccolato fondente': 20 }],
+      1: [['Triangolini di mais', 'Fruttino'], { 'Triangolini di mais': 20 }],
+      2: [['Riso nero/basmati/rosso', 'Patate', 'Olio EVO'], { 'Riso nero/basmati/rosso': 50, 'Patate': 120, 'Olio EVO': 2 }],
+      3: [['Banana', 'Gallette'], { 'Gallette': 2 }],
+      4: [[PS, 'Verdura cotta', 'Legumi surgelati o in scatola', 'Uova', 'Olio EVO'], { [PS]: 90, 'Verdura cotta': 200, 'Legumi surgelati o in scatola': 60, 'Uova': 1, 'Olio EVO': 2 }]
+    } },
+    { id: '2026-11-13-diario', data: '2026-11-13', pasti: {
+      1: [['Triangolini di mais', 'Fruttino'], { 'Triangolini di mais': 20 }],
+      3: [['Banana', 'Gallette'], { 'Gallette': 2 }]
     } }
   ];
   async function applicaAggiunte() {

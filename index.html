@@ -481,7 +481,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-13-1';
+  const VERSIONE = '2026-11-13-2';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -697,7 +697,14 @@
     { id: '2026-11-13-diario', data: '2026-11-13', pasti: {
       1: [['Triangolini di mais', 'Fruttino'], { 'Triangolini di mais': 20 }],
       3: [['Banana', 'Gallette'], { 'Gallette': 2 }]
-    } }
+    } },
+    { id: '2026-11-13-colazione-pranzo', data: '2026-11-13', pasti: {
+      0: [['Latte parzialmente scremato', 'Corn flakes', 'Cioccolato fondente'], { 'Corn flakes': 40, 'Cioccolato fondente': 20 }],
+      2: [[PS, 'Carote', 'Formaggi freschi', 'Olio EVO'], { [PS]: 90, 'Carote': 180, 'Formaggi freschi': 100, 'Olio EVO': 2 }]
+    } },
+    // Merenda pre-allenamento di lunedì, martedì e mercoledì: si AGGIUNGE a quella già segnata
+    ...['2026-11-09', '2026-11-10', '2026-11-11'].map((d) => ({ id: d + '-pre-allenamento', data: d, aggiungi: true,
+      pasti: { 3: [['3 gallette + crema di mandorle e marmellata'], {}] } }))
   ];
   async function applicaAggiunte() {
     const m = await cfg('aggiunte').get();
@@ -715,7 +722,14 @@
       const ref = docGiorno(a.data), d = await ref.get();
       const pasti = (d.exists && d.data().pasti) || {};
       Object.keys(a.pasti).forEach((i) => {
-        if (pasti[i] && (pasti[i].alimenti || []).length) return;   // pasto già compilato: non si tocca
+        const prima = pasti[i] || { alimenti: [], quantita: {} };
+        if (a.aggiungi) {   // si aggiunge a quello che c'è già
+          const alimenti = (prima.alimenti || []).slice();
+          a.pasti[i][0].forEach((n) => { if (alimenti.indexOf(n) < 0) alimenti.push(n); });
+          pasti[i] = { alimenti: alimenti, quantita: Object.assign({}, prima.quantita || {}, a.pasti[i][1]) };
+          return;
+        }
+        if ((prima.alimenti || []).length) return;   // pasto già compilato: non si tocca
         pasti[i] = { alimenti: a.pasti[i][0], quantita: a.pasti[i][1] };
       });
       [0, 1, 2, 3, 4].forEach((i) => { if (!pasti[i]) pasti[i] = { alimenti: [], quantita: {} }; });

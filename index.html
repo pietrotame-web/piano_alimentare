@@ -481,7 +481,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-16-3';
+  const VERSIONE = '2026-11-16-4';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -682,8 +682,13 @@
         f: 'Stima: valori INRAN della salsiccia di suino fresca (impasto di salame), a crudo' }
     ] },
     { id: '2026-11-16-patatine', voci: [
-      { c: 'Extra', n: 'Patatine in busta', u: 'g', p: 30, k: 535, pr: 6.5, ca: 52, gr: 33,
-        f: 'Valori medi da etichetta di patatine classiche (circa 530-540 kcal per 100 g)' }
+      { c: 'Extra', n: 'Patatine San Carlo grigliate', u: 'g', p: 30, k: 503, pr: 7.4, ca: 55, gr: 27,
+        f: 'Etichetta San Carlo Rustica (gusto grigliate), scheda del produttore e test Altroconsumo: 503 kcal per 100 g' }
+    ] },
+    // Se la voce generica "Patatine in busta" era già stata aggiunta, diventa la San Carlo (anche nei giorni già segnati)
+    { id: '2026-11-16-patatine-sancarlo', voci: [
+      Object.assign({ sostituisce: 'Patatine in busta' }, { c: 'Extra', n: 'Patatine San Carlo grigliate', u: 'g', p: 30, k: 503, pr: 7.4, ca: 55, gr: 27,
+        f: 'Etichetta San Carlo Rustica (gusto grigliate), scheda del produttore e test Altroconsumo: 503 kcal per 100 g' })
     ] }
   ];
   // Pasti dettati a Claude: l'app li scrive una volta sola, e solo nei pasti ancora vuoti (non sovrascrive niente).
@@ -721,7 +726,7 @@
       2: [['Riso nero/basmati/rosso', 'Tastasal', 'Fagiolini', 'Olio EVO'], { 'Riso nero/basmati/rosso': 100, 'Tastasal': 100, 'Fagiolini': 90, 'Olio EVO': 2 }]
     } },
     { id: '2026-11-14-patatine', data: '2026-11-14', aggiungi: true, pasti: {
-      3: [['Patatine in busta'], { 'Patatine in busta': 80 }]
+      3: [['Patatine San Carlo grigliate'], { 'Patatine San Carlo grigliate': 80 }]
     } },
     // Merenda pre-allenamento di lunedì, martedì e mercoledì: si AGGIUNGE a quella già segnata
     ...['2026-11-09', '2026-11-10', '2026-11-11'].map((d) => ({ id: d + '-pre-allenamento', data: d, aggiungi: true,
@@ -736,8 +741,15 @@
     let lista = null;
     if (ingr.length) {
       lista = await listaIngredienti();
-      ingr.forEach((a) => a.voci.forEach((v) => { if (!lista.some((x) => x.n === v.n)) lista.push(v); }));
+      const rinomine = [];
+      ingr.forEach((a) => a.voci.forEach((v0) => {
+        const v = Object.assign({}, v0); delete v.sostituisce;
+        const i = v0.sostituisce ? lista.findIndex((x) => x.n === v0.sostituisce) : -1;
+        if (i >= 0 && !lista.some((x) => x.n === v.n)) { lista[i] = v; rinomine.push([v0.sostituisce, v.n]); }
+        else if (!lista.some((x) => x.n === v.n)) lista.push(v);
+      }));
       await cfg('ingredienti').set({ lista: lista });
+      for (const [vecchio, nuovo] of rinomine) await rinominaOvunque(vecchio, nuovo);
     }
     for (const a of diario) {
       const ref = docGiorno(a.data), d = await ref.get();

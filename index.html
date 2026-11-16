@@ -481,7 +481,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-13-2';
+  const VERSIONE = '2026-11-16-1';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -672,6 +672,10 @@
     { id: '2026-11-06-caffe-ginseng', voci: [
       { c: 'Extra', n: 'Caffè espresso', u: 'pz', p: 1, k: 2, pr: 0.1, ca: 0.3, gr: 0, f: 'Stima: espresso senza zucchero (1-10 kcal a tazzina secondo le fonti); 1 pz = 1 tazzina' },
       { c: 'Extra', n: 'Caffè al ginseng', u: 'pz', p: 1, k: 60, pr: 1, ca: 9, gr: 2.3, f: 'Stima: ginseng da bar o in capsula, già zuccherato (30-80 kcal a tazzina secondo le fonti); 1 pz = 1 tazzina' }
+    ] },
+    { id: '2026-11-16-crespelle-ceci', voci: [
+      { c: 'Proteine', n: 'Crespelle di ceci con salmone e zucchine', u: 'g', p: 350, k: 141, pr: 9.2, ca: 8.8, gr: 7.6,
+        f: 'Stima da ricetta (piatto cotto, circa 400 g): 50 g farina di ceci + 1 uovo + filo d\'olio, 60 g salmone, 100 g zucchine, 80 g besciamella senza glutine, 15 g grana; olio e besciamella già compresi' }
     ] }
   ];
   // Pasti dettati a Claude: l'app li scrive una volta sola, e solo nei pasti ancora vuoti (non sovrascrive niente).
@@ -701,6 +705,9 @@
     { id: '2026-11-13-colazione-pranzo', data: '2026-11-13', pasti: {
       0: [['Latte parzialmente scremato', 'Corn flakes', 'Cioccolato fondente'], { 'Corn flakes': 40, 'Cioccolato fondente': 20 }],
       2: [[PS, 'Carote', 'Formaggi freschi', 'Olio EVO'], { [PS]: 90, 'Carote': 180, 'Formaggi freschi': 100, 'Olio EVO': 2 }]
+    } },
+    { id: '2026-11-13-cena', data: '2026-11-13', pasti: {
+      4: [['Crespelle di ceci con salmone e zucchine'], { 'Crespelle di ceci con salmone e zucchine': 350 }]
     } },
     // Merenda pre-allenamento di lunedì, martedì e mercoledì: si AGGIUNGE a quella già segnata
     ...['2026-11-09', '2026-11-10', '2026-11-11'].map((d) => ({ id: d + '-pre-allenamento', data: d, aggiungi: true,

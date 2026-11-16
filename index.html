@@ -481,7 +481,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-16-2';
+  const VERSIONE = '2026-11-16-3';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -680,6 +680,10 @@
     { id: '2026-11-16-tastasal', voci: [
       { c: 'Proteine', n: 'Tastasal', u: 'g', p: 100, k: 304, pr: 15.4, ca: 0.6, gr: 26.7,
         f: 'Stima: valori INRAN della salsiccia di suino fresca (impasto di salame), a crudo' }
+    ] },
+    { id: '2026-11-16-patatine', voci: [
+      { c: 'Extra', n: 'Patatine in busta', u: 'g', p: 30, k: 535, pr: 6.5, ca: 52, gr: 33,
+        f: 'Valori medi da etichetta di patatine classiche (circa 530-540 kcal per 100 g)' }
     ] }
   ];
   // Pasti dettati a Claude: l'app li scrive una volta sola, e solo nei pasti ancora vuoti (non sovrascrive niente).
@@ -715,6 +719,9 @@
     } },
     { id: '2026-11-14-pranzo', data: '2026-11-14', pasti: {
       2: [['Riso nero/basmati/rosso', 'Tastasal', 'Fagiolini', 'Olio EVO'], { 'Riso nero/basmati/rosso': 100, 'Tastasal': 100, 'Fagiolini': 90, 'Olio EVO': 2 }]
+    } },
+    { id: '2026-11-14-patatine', data: '2026-11-14', aggiungi: true, pasti: {
+      3: [['Patatine in busta'], { 'Patatine in busta': 80 }]
     } },
     // Merenda pre-allenamento di lunedì, martedì e mercoledì: si AGGIUNGE a quella già segnata
     ...['2026-11-09', '2026-11-10', '2026-11-11'].map((d) => ({ id: d + '-pre-allenamento', data: d, aggiungi: true,

@@ -481,7 +481,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-16-4';
+  const VERSIONE = '2026-11-18-1';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -727,6 +727,13 @@
     } },
     { id: '2026-11-14-patatine', data: '2026-11-14', aggiungi: true, pasti: {
       3: [['Patatine San Carlo grigliate'], { 'Patatine San Carlo grigliate': 80 }]
+    } },
+    { id: '2026-11-17-diario', data: '2026-11-17', pasti: {
+      0: [['Pane senza glutine', 'Marmellata 100% frutta', 'Crema di mandorle 100%'], {}],
+      1: [['Triangolini di mais', 'Fruttino'], { 'Triangolini di mais': 20 }],
+      2: [[PS, 'Broccoli', 'Formaggi freschi', 'Carne bianca', 'Olio EVO'], { [PS]: 100, 'Broccoli': 150, 'Formaggi freschi': 50, 'Carne bianca': 80, 'Olio EVO': 2 }],
+      3: [['Banana', 'Gallette al cioccolato'], {}],
+      4: [['Riso nero/basmati/rosso', 'Zucca', 'Formaggi stagionati', 'Legumi surgelati o in scatola', 'Olio EVO'], { 'Riso nero/basmati/rosso': 80, 'Zucca': 100, 'Formaggi stagionati': 30, 'Legumi surgelati o in scatola': 50, 'Olio EVO': 2 }]
     } },
     // Merenda pre-allenamento di lunedì, martedì e mercoledì: si AGGIUNGE a quella già segnata
     ...['2026-11-09', '2026-11-10', '2026-11-11'].map((d) => ({ id: d + '-pre-allenamento', data: d, aggiungi: true,

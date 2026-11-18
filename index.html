@@ -481,7 +481,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-18-1';
+  const VERSIONE = '2026-11-18-2';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -735,6 +735,13 @@
       3: [['Banana', 'Gallette al cioccolato'], {}],
       4: [['Riso nero/basmati/rosso', 'Zucca', 'Formaggi stagionati', 'Legumi surgelati o in scatola', 'Olio EVO'], { 'Riso nero/basmati/rosso': 80, 'Zucca': 100, 'Formaggi stagionati': 30, 'Legumi surgelati o in scatola': 50, 'Olio EVO': 2 }]
     } },
+    { id: '2026-11-16-diario', data: '2026-11-16', allenamento: { muscolare: true }, pasti: {
+      0: [['Pane senza glutine', 'Marmellata 100% frutta', 'Crema di mandorle 100%'], {}],
+      1: [['Fruttino', 'Gallette'], { 'Gallette': 2.5 }],
+      2: [[PS, 'Sgombro', 'Zucchine', 'Olio EVO'], { [PS]: 110, 'Sgombro': 100, 'Zucchine': 200, 'Olio EVO': 2 }],
+      3: [['Mela', 'Gallette al cioccolato'], { 'Mela': 150 }],
+      4: [['Broccoli', 'Uova', 'Gallette', 'Olio EVO'], { 'Broccoli': 200, 'Uova': 3, 'Gallette': 4, 'Olio EVO': 2 }]
+    } },
     // Merenda pre-allenamento di lunedì, martedì e mercoledì: si AGGIUNGE a quella già segnata
     ...['2026-11-09', '2026-11-10', '2026-11-11'].map((d) => ({ id: d + '-pre-allenamento', data: d, aggiungi: true,
       pasti: { 3: [['3 gallette + crema di mandorle e marmellata'], {}] } }))
@@ -773,8 +780,11 @@
         pasti[i] = { alimenti: a.pasti[i][0], quantita: a.pasti[i][1] };
       });
       [0, 1, 2, 3, 4].forEach((i) => { if (!pasti[i]) pasti[i] = { alimenti: [], quantita: {} }; });
-      if (d.exists) await ref.update({ pasti: pasti });
-      else await ref.set({ data: a.data, pasti: pasti, allenamento: { muscolare: false, cardio: false } });
+      // Allenamento: si spunta soltanto (non si toglie mai una spunta già messa)
+      const allenamento = Object.assign({ muscolare: false, cardio: false }, (d.exists && d.data().allenamento) || {});
+      Object.keys(a.allenamento || {}).forEach((k) => { if (a.allenamento[k]) allenamento[k] = true; });
+      if (d.exists) await ref.update({ pasti: pasti, allenamento: allenamento });
+      else await ref.set({ data: a.data, pasti: pasti, allenamento: allenamento });
     }
     await cfg('aggiunte').set({ fatte: fatte.concat(ingr.map((a) => a.id), diario.map((a) => a.id)) });
     return lista;

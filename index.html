@@ -481,7 +481,7 @@
 <script>
 (function () {
   // Versione dell'app: se su GitHub ce n'è una diversa, l'app si ricarica da sola con quella nuova
-  const VERSIONE = '2026-11-18-2';
+  const VERSIONE = '2026-11-18-3';
   async function controllaAggiornamento() {
     try {
       const r = await fetch('index.html?controllo=' + Date.now(), { cache: 'no-store' });
@@ -685,6 +685,10 @@
       { c: 'Extra', n: 'Patatine San Carlo grigliate', u: 'g', p: 30, k: 503, pr: 7.4, ca: 55, gr: 27,
         f: 'Etichetta San Carlo Rustica (gusto grigliate), scheda del produttore e test Altroconsumo: 503 kcal per 100 g' }
     ] },
+    { id: '2026-11-18-funghi', voci: [
+      { c: 'Verdure', n: 'Funghi', u: 'g', p: '', k: 20, pr: 3.7, ca: 0.8, gr: 0.2,
+        f: 'Valori tipici INRAN/CREA dei funghi prataioli coltivati, crudi' }
+    ] },
     // Se la voce generica "Patatine in busta" era già stata aggiunta, diventa la San Carlo (anche nei giorni già segnati)
     { id: '2026-11-16-patatine-sancarlo', voci: [
       Object.assign({ sostituisce: 'Patatine in busta' }, { c: 'Extra', n: 'Patatine San Carlo grigliate', u: 'g', p: 30, k: 503, pr: 7.4, ca: 55, gr: 27,
@@ -734,6 +738,11 @@
       2: [[PS, 'Broccoli', 'Formaggi freschi', 'Carne bianca', 'Olio EVO'], { [PS]: 100, 'Broccoli': 150, 'Formaggi freschi': 50, 'Carne bianca': 80, 'Olio EVO': 2 }],
       3: [['Banana', 'Gallette al cioccolato'], {}],
       4: [['Riso nero/basmati/rosso', 'Zucca', 'Formaggi stagionati', 'Legumi surgelati o in scatola', 'Olio EVO'], { 'Riso nero/basmati/rosso': 80, 'Zucca': 100, 'Formaggi stagionati': 30, 'Legumi surgelati o in scatola': 50, 'Olio EVO': 2 }]
+    } },
+    { id: '2026-11-15-diario', data: '2026-11-15', pasti: {
+      0: [['Pane senza glutine', 'Marmellata 100% frutta', 'Crema di mandorle 100%'], {}],
+      2: [['Riso nero/basmati/rosso', 'Funghi', 'Formaggi stagionati', 'Olio EVO'], { 'Riso nero/basmati/rosso': 80, 'Funghi': 80, 'Formaggi stagionati': 30, 'Olio EVO': 2 }],
+      4: [[PS, 'Formaggi freschi', 'Zucchine', 'Olio EVO'], { [PS]: 90, 'Formaggi freschi': 100, 'Zucchine': 150, 'Olio EVO': 2 }]
     } },
     { id: '2026-11-16-diario', data: '2026-11-16', allenamento: { muscolare: true }, pasti: {
       0: [['Pane senza glutine', 'Marmellata 100% frutta', 'Crema di mandorle 100%'], {}],
